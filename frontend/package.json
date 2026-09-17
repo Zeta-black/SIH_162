@@ -1,0 +1,29 @@
+{
+  "name": "firetrace-dashboard",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "description": "FIRETRACE — industrial thermal event monitoring dashboard (SIH 2026, PS 26162)",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "lint": "eslint src --ext .js,.jsx"
+  },
+  "dependencies": {
+    "leaflet": "1.9.4",
+    "react": "18.3.1",
+    "react-dom": "18.3.1",
+    "react-leaflet": "4.2.1",
+    "react-router-dom": "^6.30.6"
+  },
+  "devDependencies": {
+    "@types/react": "18.3.12",
+    "@types/react-dom": "18.3.1",
+    "@vitejs/plugin-react": "4.3.4",
+    "eslint": "8.57.1",
+    "eslint-plugin-react": "7.37.2",
+    "eslint-plugin-react-hooks": "4.6.2",
+    "vite": "5.4.11"
+  }
+}

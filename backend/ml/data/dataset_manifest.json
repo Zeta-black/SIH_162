@@ -1,0 +1,249 @@
+{
+  "dataset_version": "1.0.0",
+  "feature_version": "1.0.0",
+  "label_policy_version": "1.0.0",
+  "built_at": "2026-09-16T02:09:42.632084+00:00",
+  "built_offline": true,
+  "rows_labelled": 3514,
+  "duplicate_detections_removed": 18,
+  "rows_unlabelled_excluded": 7290,
+  "label_counts": {
+    "INDUSTRIAL_FIRE": 72,
+    "GAS_FLARE_OR_INDUSTRIAL_HEAT": 2534,
+    "AGRICULTURAL_BURNING": 237,
+    "NATURAL_FIRE": 671
+  },
+  "rule_counts": {
+    "R0_ambiguous": 7472,
+    "R2_episodic_onsite_strong_signal": 68,
+    "R1_persistent_high_heat_facility": 1685,
+    "R5_cropland_low_power_episodic": 11,
+    "R1b_very_persistent_on_facility": 849,
+    "R6_vegetation_clear_of_industry": 671,
+    "R2b_episodic_adjacent_high_heat": 4,
+    "R4_cropland_in_harvest_window": 11,
+    "R7_harvest_season_burst": 233
+  },
+  "regions": [
+    {
+      "region": "vadodara",
+      "events": 1,
+      "labelled": 0
+    },
+    {
+      "region": "taloja",
+      "events": 6,
+      "labelled": 1
+    },
+    {
+      "region": "jamnagar",
+      "events": 379,
+      "labelled": 44
+    },
+    {
+      "region": "hazira",
+      "events": 990,
+      "labelled": 676
+    },
+    {
+      "region": "singrauli",
+      "events": 945,
+      "labelled": 144
+    },
+    {
+      "region": "korba",
+      "events": 1210,
+      "labelled": 230
+    },
+    {
+      "region": "bhilai",
+      "events": 53,
+      "labelled": 0
+    },
+    {
+      "region": "jamshedpur",
+      "events": 1083,
+      "labelled": 612
+    },
+    {
+      "region": "manali_chennai",
+      "events": 2,
+      "labelled": 0
+    },
+    {
+      "region": "paradip",
+      "events": 0,
+      "labelled": 0
+    },
+    {
+      "region": "barmer",
+      "events": 0,
+      "labelled": 0
+    },
+    {
+      "region": "mathura",
+      "events": 0,
+      "labelled": 0
+    },
+    {
+      "region": "vizag",
+      "events": 528,
+      "labelled": 262
+    },
+    {
+      "region": "punjab_malwa",
+      "events": 202,
+      "labelled": 19
+    },
+    {
+      "region": "haryana",
+      "events": 6,
+      "labelled": 0
+    },
+    {
+      "region": "up_west",
+      "events": 0,
+      "labelled": 0
+    },
+    {
+      "region": "similipal",
+      "events": 607,
+      "labelled": 292
+    },
+    {
+      "region": "kanha_pench",
+      "events": 0,
+      "labelled": 0
+    },
+    {
+      "region": "bastar",
+      "events": 0,
+      "labelled": 0
+    },
+    {
+      "region": "bandipur",
+      "events": 1,
+      "labelled": 0
+    },
+    {
+      "region": "uttarakhand",
+      "events": 0,
+      "labelled": 0
+    },
+    {
+      "region": "nallamala",
+      "events": 0,
+      "labelled": 0
+    },
+    {
+      "region": "punjab_central",
+      "events": 1255,
+      "labelled": 193
+    },
+    {
+      "region": "angul",
+      "events": 3736,
+      "labelled": 1059
+    }
+  ],
+  "windows": [
+    {
+      "id": "a1_2025-10-25",
+      "products": [
+        "VIIRS_SNPP_SP",
+        "VIIRS_NOAA20_SP"
+      ],
+      "start": "2025-10-25",
+      "days": 5
+    },
+    {
+      "id": "a2_2025-10-30",
+      "products": [
+        "VIIRS_SNPP_SP",
+        "VIIRS_NOAA20_SP"
+      ],
+      "start": "2025-10-30",
+      "days": 5
+    },
+    {
+      "id": "a3_2025-11-04",
+      "products": [
+        "VIIRS_SNPP_SP",
+        "VIIRS_NOAA20_SP"
+      ],
+      "start": "2025-11-04",
+      "days": 5
+    },
+    {
+      "id": "a4_2025-11-09",
+      "products": [
+        "VIIRS_SNPP_SP",
+        "VIIRS_NOAA20_SP"
+      ],
+      "start": "2025-11-09",
+      "days": 5
+    },
+    {
+      "id": "a5_2025-11-14",
+      "products": [
+        "VIIRS_SNPP_SP",
+        "VIIRS_NOAA20_SP"
+      ],
+      "start": "2025-11-14",
+      "days": 5
+    },
+    {
+      "id": "b1_2026-03-01",
+      "products": [
+        "VIIRS_SNPP_SP",
+        "VIIRS_NOAA20_SP"
+      ],
+      "start": "2026-03-01",
+      "days": 5
+    },
+    {
+      "id": "b2_2026-03-06",
+      "products": [
+        "VIIRS_SNPP_SP",
+        "VIIRS_NOAA20_SP"
+      ],
+      "start": "2026-03-06",
+      "days": 5
+    },
+    {
+      "id": "b3_2026-03-11",
+      "products": [
+        "VIIRS_SNPP_SP",
+        "VIIRS_NOAA20_SP"
+      ],
+      "start": "2026-03-11",
+      "days": 5
+    },
+    {
+      "id": "b4_2026-03-16",
+      "products": [
+        "VIIRS_SNPP_SP",
+        "VIIRS_NOAA20_SP"
+      ],
+      "start": "2026-03-16",
+      "days": 5
+    },
+    {
+      "id": "b5_2026-03-21",
+      "products": [
+        "VIIRS_SNPP_SP",
+        "VIIRS_NOAA20_SP"
+      ],
+      "start": "2026-03-21",
+      "days": 5
+    }
+  ],
+  "fetch_failures": 0,
+  "observation_source": "NASA FIRMS (real detections)",
+  "context_source": "OpenStreetMap via Overpass (real features)",
+  "label_source": "weak supervision rules (NOT verified ground truth)",
+  "caveat": "Labels are inferred by a documented rule policy, not by field verification. Any model metric computed on this dataset measures agreement with that policy.",
+  "duplicate_unlabelled_removed": 182,
+  "rows_total_after_dedupe": 10804,
+  "manifest_note": "rows_unlabelled_excluded previously reported the pre-deduplication count (7472); corrected to match the 7290 rows actually written to unlabelled_detections.csv. rule_counts are rule FIRINGS and still include the duplicates, so R0_ambiguous exceeds rows_unlabelled_excluded by 182."
+}

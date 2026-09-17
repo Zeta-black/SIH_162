@@ -1,0 +1,37 @@
+# Secrets — never commit
+.env
+*.env
+!.env.example
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+
+# FIRETRACE runtime artifacts
+backend/app/data/*.sqlite3
+backend/app/data/cache/
+# Trained model IS committed so the project runs without retraining.
+# Remove the leading "#" below if you prefer to keep artifacts out of git.
+# backend/ml/artifacts/*.joblib
+
+# Node
+node_modules/
+dist/
+.vite/
+
+# OS / editor
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+
+# npm script artifacts
+scripts/*.log
+
+# pytest
+.pytest_cache/

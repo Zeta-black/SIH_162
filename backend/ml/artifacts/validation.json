@@ -1,0 +1,163 @@
+{
+  "generated_at": "2026-09-17T14:12:47.306138+00:00",
+  "dataset_rows": 3514,
+  "train_rows": 2279,
+  "test_rows": 1235,
+  "class_distribution": {
+    "INDUSTRIAL_FIRE": 72,
+    "GAS_FLARE_OR_INDUSTRIAL_HEAT": 2534,
+    "AGRICULTURAL_BURNING": 237,
+    "NATURAL_FIRE": 671
+  },
+  "leakage": {
+    "duplicate_feature_rows_across_split": 0,
+    "shared_coordinates": 0,
+    "shared_regions": 0,
+    "train_regions": [
+      "hazira",
+      "jamnagar",
+      "jamshedpur",
+      "korba",
+      "punjab_malwa",
+      "similipal",
+      "singrauli",
+      "vizag"
+    ],
+    "test_regions": [
+      "angul",
+      "punjab_central",
+      "taloja"
+    ],
+    "duplicate_detection_ids": 0,
+    "date_overlap_days": 48,
+    "split_axis": "region (spatial), not time",
+    "verdict": "CLEAN"
+  },
+  "baselines": {
+    "majority_class": {
+      "rationale": "Always predicts the commonest class. The floor any model must beat.",
+      "balanced_accuracy": 0.25,
+      "macro_f1": 0.2235,
+      "industrial_fire_precision": 0.0,
+      "industrial_fire_recall": 0.0,
+      "industrial_fire_f1": 0.0
+    },
+    "stratified_random": {
+      "rationale": "Guesses in proportion to the class distribution.",
+      "balanced_accuracy": 0.3032,
+      "macro_f1": 0.2348,
+      "industrial_fire_precision": 0.0333,
+      "industrial_fire_recall": 0.125,
+      "industrial_fire_f1": 0.0526
+    },
+    "one_rule_stump": {
+      "rationale": "A single threshold on a single feature \u2014 the simplest non-trivial rule.",
+      "balanced_accuracy": 0.4972,
+      "macro_f1": 0.3309,
+      "industrial_fire_precision": 0.0,
+      "industrial_fire_recall": 0.0,
+      "industrial_fire_f1": 0.0
+    },
+    "shallow_tree_d3": {
+      "rationale": "An interpretable tree a human could read out loud.",
+      "balanced_accuracy": 0.9972,
+      "macro_f1": 0.9912,
+      "industrial_fire_precision": 1.0,
+      "industrial_fire_recall": 1.0,
+      "industrial_fire_f1": 1.0
+    },
+    "logistic_regression": {
+      "rationale": "A linear model \u2014 tests whether the problem needs non-linearity at all.",
+      "balanced_accuracy": 1.0,
+      "macro_f1": 1.0,
+      "industrial_fire_precision": 1.0,
+      "industrial_fire_recall": 1.0,
+      "industrial_fire_f1": 1.0
+    },
+    "random_forest": {
+      "rationale": "The shipped model.",
+      "balanced_accuracy": 1.0,
+      "macro_f1": 1.0,
+      "industrial_fire_precision": 1.0,
+      "industrial_fire_recall": 1.0,
+      "industrial_fire_f1": 1.0
+    }
+  },
+  "split_stability": {
+    "majority_class": {
+      "splits": 12,
+      "balanced_accuracy_mean": 0.2292,
+      "balanced_accuracy_std": 0.0691,
+      "balanced_accuracy_min": 0.0,
+      "balanced_accuracy_max": 0.25,
+      "industrial_recall_mean": 0.0
+    },
+    "stratified_random": {
+      "splits": 12,
+      "balanced_accuracy_mean": 0.2364,
+      "balanced_accuracy_std": 0.0599,
+      "balanced_accuracy_min": 0.0489,
+      "balanced_accuracy_max": 0.2979,
+      "industrial_recall_mean": 0.0323
+    },
+    "one_rule_stump": {
+      "splits": 12,
+      "balanced_accuracy_mean": 0.4777,
+      "balanced_accuracy_std": 0.0453,
+      "balanced_accuracy_min": 0.3333,
+      "balanced_accuracy_max": 0.5,
+      "industrial_recall_mean": 0.0
+    },
+    "shallow_tree_d3": {
+      "splits": 12,
+      "balanced_accuracy_mean": 0.9918,
+      "balanced_accuracy_std": 0.0114,
+      "balanced_accuracy_min": 0.9612,
+      "balanced_accuracy_max": 1.0,
+      "industrial_recall_mean": 0.9984
+    },
+    "logistic_regression": {
+      "splits": 12,
+      "balanced_accuracy_mean": 0.9964,
+      "balanced_accuracy_std": 0.0042,
+      "balanced_accuracy_min": 0.9861,
+      "balanced_accuracy_max": 1.0,
+      "industrial_recall_mean": 1.0
+    },
+    "random_forest": {
+      "splits": 12,
+      "balanced_accuracy_mean": 0.9689,
+      "balanced_accuracy_std": 0.0676,
+      "balanced_accuracy_min": 0.75,
+      "balanced_accuracy_max": 1.0,
+      "industrial_recall_mean": 0.9796
+    }
+  },
+  "behaviour_on_unlabelled": {
+    "available": true,
+    "rows": 7290,
+    "predicted_distribution": {
+      "INDUSTRIAL_FIRE": 983,
+      "AGRICULTURAL_BURNING": 3037,
+      "GAS_FLARE_OR_INDUSTRIAL_HEAT": 2984,
+      "NATURAL_FIRE": 286
+    },
+    "mean_top_probability": 0.6597,
+    "share_below_045": 0.1561,
+    "share_below_072": 0.6314,
+    "thin_evidence_rows": 689,
+    "thin_evidence_share": 0.0945,
+    "abstained_under_gate": 1651,
+    "note": "No ground truth exists for these rows \u2014 the policy refused to label them. This measures model behaviour and gate coverage, not correctness."
+  },
+  "random_forest_lift_over_best_baseline": 0.0,
+  "latency": {
+    "single_prediction_ms": 53.608,
+    "batch_rows": 1235,
+    "batch_total_ms": 77.75,
+    "per_row_in_batch_ms": 0.063,
+    "full_training_seconds": 0.74
+  },
+  "split": "GroupShuffleSplit by region_id, test_size=0.25, seed 42",
+  "caveat": "Labels come from a documented weak-supervision policy, not verified incident reports. Every figure here measures agreement with that policy on held-out regions, not real-world correctness."
+}
