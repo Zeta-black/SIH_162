@@ -57,9 +57,9 @@ export default function Model() {
       </div>
     )
 
-  const metrics = data.metrics ?? {}
   const summary = data.training_summary ?? {}
   const policy = data.label_policy ?? {}
+  const metrics = data.metrics ?? {}
   const perClass = metrics.per_class ?? {}
   const labels = metrics.labels ?? []
   const matrix = metrics.confusion_matrix ?? []
@@ -89,23 +89,24 @@ export default function Model() {
           <h1>Model</h1>
           <p className="lede">
             A Random Forest classifier over {int(data.n_features)} features. Everything on this
-            page is read from the trained artifact and its evaluation run — no figure here is
-            written by hand.
+            page is read from the trained artifact and its documented methodology.
           </p>
         </header>
 
         {/* ── the caveat that governs every number below ─────────────── */}
         <div style={{ marginBottom: 20 }}>
           <Note kind="warn">
-            <strong>Read these metrics as agreement with a labelling policy, not as
-            fire-classification accuracy.</strong>{' '}
+            <strong>Independent ground truth is required to establish real-world
+            fire-classification performance.</strong>{' '}
             No public dataset states the true cause of an individual FIRMS detection, so training
             labels were assigned by the documented rule policy below rather than by field
             verification. The observations are real; the labels are inferred.
           </Note>
         </div>
 
-        <Group title="Held-out performance" note={metrics.split_strategy}>
+        {false && (
+          <>
+          <Group title="Held-out performance" note={metrics.split_strategy}>
           <div className="metrics metrics-4">
             <Metric label="Balanced accuracy" value={num(metrics.balanced_accuracy, 3)} sub="mean per-class recall" />
             <Metric label="Macro F1" value={num(metrics.macro_f1, 3)} sub="unweighted across classes" />
@@ -287,6 +288,36 @@ export default function Model() {
         )}
 
         {/* ── feature importance ─────────────────────────────────────── */}
+          </>
+        )}
+
+        <Group title="Model pipeline">
+          <Module>
+            <div className="m sm" style={{ lineHeight: 2 }}>
+              Input satellite and geospatial features → feature engineering → Random Forest →
+              class prediction → model-assisted likelihood → FIRETRACE classification and triage.
+            </div>
+            <p className="sm dim" style={{ margin: '10px 0 0' }}>
+              The model supports operator review; it does not replace field verification.
+            </p>
+          </Module>
+        </Group>
+
+        <Group title="Evaluation methodology">
+          <Module title="Why the split is grouped by region">
+            <p className="sm">
+              Evaluation is held out by <strong>region</strong>. A random row-wise split could put
+              detections from the same refinery on both sides, letting a model memorise locations
+              rather than learn patterns that transfer to a new place.
+            </p>
+            <p className="sm dim" style={{ marginTop: 12 }}>
+              Training and evaluation use the documented rule-derived labelling policy. This is a
+              methodology check, not evidence of real-world fire-classification performance;
+              independent, field-verified ground truth is required for that claim.
+            </p>
+          </Module>
+        </Group>
+
         {features.length > 0 && (
           <Module title="What the model relies on" note="Gini importance, computed at training time">
             <Module>

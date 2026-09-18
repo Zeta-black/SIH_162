@@ -846,4 +846,5 @@ Built for Smart India Hackathon 2026, Problem Statement 26162, by **Team Classy 
 > requires human verification before any operational decision.
 #
 #   s i h h h h h h h h  
+ #   S I H _ D E M O  
  

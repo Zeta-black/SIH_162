@@ -209,8 +209,9 @@ p:last-child { margin: 0; }
   padding: 10px;
   overflow: hidden;
 }
-.ops-main { display: grid; grid-template-columns: minmax(0, 1.9fr) minmax(0, 1fr); gap: 10px; min-height: 0; }
-.ops-col { display: flex; flex-direction: column; gap: 10px; min-height: 0; overflow-y: auto; }
+.ops-head { display: grid; gap: 10px; min-width: 0; }
+.ops-main { display: grid; grid-template-columns: minmax(0, 1.9fr) minmax(0, 1fr); gap: 10px; min-width: 0; min-height: 0; }
+.ops-col { display: flex; flex-direction: column; gap: 10px; min-width: 0; min-height: 0; overflow-y: auto; }
 .ops-fill { display: flex; flex-direction: column; min-height: 0; margin-bottom: 0; }
 .ops-fill .mod-body-flush { flex: 1; min-height: 0; display: flex; flex-direction: column; }
 
@@ -240,7 +241,7 @@ p:last-child { margin: 0; }
 
 /* ══════════════════════════════════════════════════════════ metric strip ══ */
 .metrics { display: grid; gap: 1px; background: var(--rule); border: 1px solid var(--rule); }
-.metrics-6 { grid-template-columns: repeat(6, minmax(0, 1fr)); }
+.metrics-6 { grid-template-columns: repeat(auto-fit, minmax(min(100%, 180px), 1fr)); }
 .metrics-5 { grid-template-columns: repeat(5, minmax(0, 1fr)); }
 .metrics-4 { grid-template-columns: repeat(4, minmax(0, 1fr)); }
 .metrics-3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
@@ -372,7 +373,7 @@ input[type='range'] { width: 100%; accent-color: var(--accent); height: 18px; }
 .log-note { color: var(--ink-3); margin-top: 1px; }
 
 /* ════════════════════════════════════════════════════════════ data grid ══ */
-table.grid { width: 100%; border-collapse: collapse; font-size: 11.5px; }
+table.grid { width: max-content; min-width: 100%; border-collapse: collapse; font-size: 11.5px; }
 table.grid th {
   position: sticky; top: 0; z-index: 3;
   text-align: left; padding: 0 9px; height: 26px;
@@ -393,7 +394,7 @@ table.grid tbody tr.hit:hover { background: var(--accent-wash); }
 table.grid tbody tr.sel { background: var(--accent-wash); box-shadow: inset 2px 0 0 var(--accent); }
 table.grid td.num { font-family: var(--mono); font-variant-numeric: tabular-nums; }
 
-.gridwrap { overflow: auto; min-height: 0; }
+.gridwrap { max-width: 100%; overflow: auto; min-height: 0; }
 
 /* ════════════════════════════════════════════════════════════ key/value ══ */
 dl.kv { display: grid; grid-template-columns: minmax(96px, auto) minmax(0, 1fr); gap: 0; margin: 0; font-size: 11.5px; }
@@ -579,7 +580,6 @@ dl.kv dd {
 /* ═══════════════════════════════════════════════════════════ responsive ══ */
 @media (max-width: 1340px) {
   .workspace { grid-template-columns: 216px minmax(0, 1fr) 302px; }
-  .metrics-6 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 }
 @media (max-width: 1080px) {
   .split { grid-template-columns: minmax(0, 1fr); }
@@ -592,7 +592,7 @@ dl.kv dd {
   .nav a span { display: none; }
   .mark-sub { display: none; }
   .g2, .g3 { grid-template-columns: minmax(0, 1fr); }
-  .metrics-6, .metrics-5, .metrics-4, .metrics-3 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .metrics-5, .metrics-4, .metrics-3 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .workspace { grid-template-columns: minmax(0, 1fr); grid-template-rows: auto 380px auto; overflow-y: auto; }
   .dock, .dock-r { border: 0; border-bottom: 1px solid var(--rule-strong); overflow: visible; }
 }

@@ -135,16 +135,16 @@ def _acquire_events(
                     message += f" {len(result.errors)} product(s) unavailable."
                 return result.events, "live", "ok", message, result.products_used
 
-            # Reached NASA but the window is genuinely empty.
-            if mode == "live":
-                return (
-                    [],
-                    "live",
-                    "no_data",
-                    f"NASA FIRMS returned no detections in this area for the last {days} day(s).",
-                    result.products_used,
-                )
-            log.info("[FALLBACK] live feed returned no rows; using snapshot")
+            # A valid FIRMS response with no usable rows is a successful live
+            # query, not an outage. This applies to Auto as well as explicit
+            # Live mode: only an actual client failure may select the snapshot.
+            return (
+                [],
+                "live",
+                "no_data",
+                f"NASA FIRMS returned no detections in this area for the last {days} day(s).",
+                result.products_used,
+            )
         except firms_service.FirmsError as exc:
             if mode == "live":
                 return [], "live", exc.kind, str(exc), []  # type: ignore[return-value]

@@ -73,48 +73,55 @@ export default function Operations() {
   return (
     <div className="surface surface-flush">
       <div className="ops">
-        {status?.mode === 'snapshot' && (
-          <Note kind="warn">
-            <strong>Historical capture.</strong> {status.firms_message} Every record shown is a
-            real past NASA detection — none of it is generated.
-          </Note>
-        )}
+        <div className="ops-head">
+          {status?.mode === 'snapshot' && (
+            <Note kind="warn">
+              <strong>Historical capture.</strong> {status.firms_message} Every record shown is a
+              real past NASA detection — none of it is generated.
+            </Note>
+          )}
+          {status?.mode === 'live' && status.firms_status === 'no_data' && (
+            <Note kind="plain">
+              <strong>Live FIRMS data retrieved successfully.</strong> {status.firms_message}
+            </Note>
+          )}
 
-        {/* ── headline state ───────────────────────────────────────────── */}
-        <div className="metrics metrics-6">
-          <Metric
-            label="Detections"
-            value={int(summary?.total_events)}
-            sub={`${region.label.split(' — ')[0]} · ${window.label}`}
-          />
-          <Metric
-            label="Industrial"
-            value={int(summary?.industrial_related)}
-            sub="fire + persistent heat"
-          />
-          <Metric
-            label="High priority"
-            value={int(summary?.high_priority)}
-            sub="triage first"
-            tone="alarm"
-          />
-          <Metric
-            label="Unresolved"
-            value={int(summary?.low_confidence)}
-            sub="low vote score or abstained"
-            tone="warn"
-          />
-          <Metric
-            label="Persistent"
-            value={int(summary?.persistent_sources)}
-            sub="recurring signature"
-          />
-          <Metric
-            label="Total radiative"
-            value={num(summary?.frp_total_mw, 0)}
-            unit="MW"
-            sub="sum of reported FRP"
-          />
+          {/* ── headline state ─────────────────────────────────────────── */}
+          <div className="metrics metrics-6">
+            <Metric
+              label="Detections"
+              value={int(summary?.total_events)}
+              sub={`${region.label.split(' — ')[0]} · ${window.label}`}
+            />
+            <Metric
+              label="Industrial"
+              value={int(summary?.industrial_related)}
+              sub="fire + persistent heat"
+            />
+            <Metric
+              label="High priority"
+              value={int(summary?.high_priority)}
+              sub="triage first"
+              tone="alarm"
+            />
+            <Metric
+              label="Unresolved"
+              value={int(summary?.low_confidence)}
+              sub="low vote score or abstained"
+              tone="warn"
+            />
+            <Metric
+              label="Persistent"
+              value={int(summary?.persistent_sources)}
+              sub="recurring signature"
+            />
+            <Metric
+              label="Total radiative"
+              value={num(summary?.frp_total_mw, 0)}
+              unit="MW"
+              sub="sum of reported FRP"
+            />
+          </div>
         </div>
 
         <div className="ops-main">

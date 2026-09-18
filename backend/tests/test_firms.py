@@ -41,6 +41,14 @@ class _SequenceClient:
         self.urls.append(url)
         return self.responses.pop(0)
 
+
+class _Store:
+    def upsert_events(self, _events):
+        return None
+
+    def record_ingest(self, *_args):
+        return None
+
 VIIRS_CSV = """latitude,longitude,bright_ti4,scan,track,acq_date,acq_time,satellite,instrument,confidence,version,bright_ti5,frp,daynight
 21.10014,72.63404,336.61,0.6,0.53,2026-09-10,748,N21,VIIRS,n,2.0NRT,298.34,36.33,D
 21.10247,72.64529,342.82,0.6,0.53,2026-09-10,748,N21,VIIRS,h,2.0NRT,295.75,9.05,N
@@ -212,6 +220,36 @@ class TestEventId:
 
 
 class TestProductStrategy:
+    def test_successful_empty_response_is_a_valid_live_result(self):
+        client = _SequenceClient([_Response(200, "latitude,longitude,acq_date,acq_time\n")])
+        result = FirmsClient(client=client).fetch_area(
+            (68.0, 6.5, 97.5, 36.0), products=["VIIRS_NOAA21_NRT"]
+        )
+        assert result.events == []
+        assert result.products_used == ["VIIRS_NOAA21_NRT"]
+
+    def test_auto_mode_keeps_a_successful_empty_result_live(self, monkeypatch):
+        from app.services import pipeline
+
+        class EmptyFirmsClient:
+            def fetch_area(self, **_kwargs):
+                from app.services.firms import FirmsFetchResult
+
+                return FirmsFetchResult(products_used=["VIIRS_NOAA21_NRT"])
+
+        monkeypatch.setattr(pipeline.firms_service, "FirmsClient", EmptyFirmsClient)
+        monkeypatch.setattr(pipeline, "get_store", lambda: _Store())
+
+        events, resolved_mode, status, message, products = pipeline._acquire_events(
+            (68.0, 6.5, 97.5, 36.0), 1, "auto"
+        )
+
+        assert events == []
+        assert resolved_mode == "live"
+        assert status == "no_data"
+        assert "no detections" in message.lower()
+        assert products == ["VIIRS_NOAA21_NRT"]
+
     def test_primary_success_does_not_download_secondary_products(self):
         client = _SequenceClient([_Response(200, VIIRS_CSV)])
         result = FirmsClient(client=client).fetch_area(
