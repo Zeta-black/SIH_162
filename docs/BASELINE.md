@@ -145,7 +145,7 @@ and does not need to be manufactured.
 
 ## 5. Defects found
 
-### D1 — Abnormality is manufactured from missing history *(integrity, high)*
+### D1 — Abnormality is manufactured from missing history *(integrity, high)* — **FIXED**
 
 `backend/app/services/priority.py:83`
 
@@ -171,7 +171,13 @@ is built from ten 5-day windows (Oct–Nov 2025, Mar 2026), so a September 2026
 event has an empty 60-day lookback *because the archive has no September data*,
 not because the site is quiet. It inflates priority across 70% of the map and
 is exactly the "never manufacture a normal from insufficient data" rule being
-broken. Fix in Phase 3.
+broken.
+
+**Fixed in Phase 3.** `abnormality()` now returns `(value | None, status)` and
+`compute_priority` renormalises the remaining weights when it cannot be
+assessed. Measured effect: "needs attention" 11 -> 8, mean priority score
+0.4403 -> 0.3868, and only 16 of 390 sites (4%) turn out to have enough
+per-location history to assess at all. See `docs/MODEL_AUDIT.md` sections 4-5.
 
 ### D2 — Bad FIRMS key yields an empty map labelled "Live" *(reliability, high)*
 
@@ -179,7 +185,11 @@ With `FIRMS_MAP_KEY=deadbeef…`, `/api/hotspots?mode=live` returns HTTP 200 in
 9.6 s with `returned: 0`, `firms_status: "not_configured"`, message *"NASA FIRMS
 rejected the configured MAP_KEY"* — but **`mode: "live"`, `label: "Live NASA
 FIRMS"`** and **no fallback to the snapshot**. The honest message is there; the
-automatic recovery is not. A judge would see an empty map. Fix in Phase 2.
+automatic recovery is not. A judge would see an empty map.
+
+**Fixed in Phase 2.** Every failure now degrades live -> cached -> archive and
+the resolved mode says which rung it landed on. Verified with a wrong key: 811
+real cached detections, `state: "offline"`, `is_live: false`.
 
 ### D3 — First paint is a spinner on blank grey *(judge-facing, high)*
 
@@ -187,12 +197,18 @@ automatic recovery is not. A judge would see an empty map. Fix in Phase 2.
 entire application on `/api/meta`. At 1920×1080 the landing route took **31.4 s**
 to settle. `docs/screens/before/overview-1366x768.png` is the literal first
 impression: a spinner and "Connecting to the analysis backend…" on an empty
-page. Fix in Phase 1/2.
+page.
+
+**Fixed in Phase 1.** The map screen renders immediately with skeletons and no
+longer gates on `/api/meta`; measured interactive at 1,510 ms.
 
 ### D4 — Six React duplicate-key console errors *(quality)*
 
 `CONSOLE ERRORS @1920x1080: 6` — *"Encountered two children with the same key"*.
-Zero console errors is a definition-of-done item. Fix in Phase 1.
+Zero console errors is a definition-of-done item.
+
+**Fixed in Phase 1.** The new map screen reports zero console errors at all
+three viewports, asserted by smoke group 7.
 
 ### D5 — Factor text quality *(honesty, medium)*
 

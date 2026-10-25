@@ -79,11 +79,44 @@ def industrial_proximity(facility: NearestFacility | None) -> float:
     return _clamp(1.0 - (facility.distance_km / radius))
 
 
-def abnormality(recurrence: RecurrenceResult) -> float:
-    """How unusual this detection is for this location."""
+# A location needs at least this many distinct prior detection days before
+# "unusual for this site" means anything. Below it there is no baseline to be
+# unusual against. Prototype default; see docs/PRIORITY_RULES.md.
+MIN_DAYS_FOR_BASELINE = 2
+
+
+def abnormality(recurrence: RecurrenceResult) -> tuple[float | None, str]:
+    """How unusual this detection is for this location, or None if unknowable.
+
+    Returns (value, status). `None` means "not assessed" — there is no baseline
+    at this location to compare against, so no number is invented.
+
+    This used to return `1.0 - persistence_ratio` whenever *any* history was
+    loaded globally. A location with zero prior detections therefore scored
+    `abnormality = 1.0`, "maximally unusual". Measured on the demo archive:
+    351 of 500 detections (70%) carried exactly 1.0, every one of them with no
+    prior detection at its location.
+
+    That conflated two different statements:
+
+        "we watched this place and it never lit up"   -> genuinely unusual
+        "we have no coverage of this place"           -> unknown, not unusual
+
+    In this archive it is overwhelmingly the second. The capture spans
+    2025-11-11 to 2026-09-10 but is built from ten 5-day windows, so a
+    September event has an empty 60-day lookback because the archive has no
+    September data, not because the site is quiet. 325 of 390 sites (83%) have
+    zero prior detection days and none has more than eight.
+
+    So: below MIN_DAYS_FOR_BASELINE prior days, this returns None and
+    compute_priority renormalises the remaining weights rather than letting a
+    manufactured value drive the score.
+    """
     if not recurrence.history_available:
-        return 0.5  # no history loaded: neither routine nor novel
-    return _clamp(1.0 - recurrence.persistence_ratio)
+        return None, "no_history_loaded"
+    if recurrence.distinct_days < MIN_DAYS_FOR_BASELINE:
+        return None, "insufficient_history"
+    return _clamp(1.0 - recurrence.persistence_ratio), "assessed"
 
 
 def recency(event: HotspotEvent, now: datetime | None = None) -> float:
@@ -103,14 +136,18 @@ def compute_priority(
     recurrence: RecurrenceResult,
     now: datetime | None = None,
 ) -> PriorityResult:
-    components = {
+    abnormality_value, abnormality_status = abnormality(recurrence)
+
+    components: dict[str, float] = {
         "model_confidence": round(_clamp(classification.confidence), 4),
         "class_severity": round(CLASS_SEVERITY.get(classification.label, 0.4), 4),
         "thermal_severity": round(thermal_severity(event), 4),
         "industrial_proximity": round(industrial_proximity(facility), 4),
-        "abnormality": round(abnormality(recurrence), 4),
         "recency": round(recency(event, now), 4),
     }
+    if abnormality_value is not None:
+        components["abnormality"] = round(abnormality_value, 4)
+
     weights = {
         "model_confidence": settings.priority_weight_confidence,
         "class_severity": settings.priority_weight_industrial_class,
@@ -120,8 +157,13 @@ def compute_priority(
         "recency": settings.priority_weight_recency,
     }
 
-    total_weight = sum(weights.values()) or 1.0
-    score = sum(components[k] * weights[k] for k in components) / total_weight
+    # Renormalise over the components that could actually be assessed. A
+    # component we cannot measure must not contribute a made-up value, and it
+    # must not silently drag the score down either — so its weight is removed
+    # from the denominator rather than multiplied by a guess.
+    applicable = {k: w for k, w in weights.items() if k in components}
+    total_weight = sum(applicable.values()) or 1.0
+    score = sum(components[k] * applicable[k] for k in components) / total_weight
     score = round(_clamp(score), 4)
 
     if score >= settings.priority_high_threshold:
@@ -135,7 +177,15 @@ def compute_priority(
         score=score,
         level=level,  # type: ignore[arg-type]
         components=components,
-        weights={k: round(v / total_weight, 4) for k, v in weights.items()},
+        weights={k: round(v / total_weight, 4) for k, v in applicable.items()},
+        abnormality_status=abnormality_status,
+        # 0-100, kept separate from the score and from the class on purpose:
+        # "what it is", "how unusual it is" and "how urgently to look" are three
+        # different questions and are never merged into one number.
+        abnormality_score=(
+            None if abnormality_value is None else round(abnormality_value * 100)
+        ),
+        unassessed=[k for k in weights if k not in components],
     )
 
 
@@ -153,7 +203,12 @@ def formula_description() -> dict[str, object]:
             "class_severity": "How much attention the predicted class warrants.",
             "thermal_severity": "Fire radiative power on a log scale, or brightness if FRP is absent.",
             "industrial_proximity": "1.0 on a mapped facility, decaying to 0 at the search radius.",
-            "abnormality": "1 - persistence. A source that burns every day scores low.",
+            "abnormality": (
+                "1 - persistence, but only where the location has at least "
+                "{min_days} distinct prior detection days. Below that it is reported "
+                "as not assessed and its weight is redistributed, rather than "
+                "a value being invented."
+            ).format(min_days=MIN_DAYS_FOR_BASELINE),
             "recency": "Exponential decay on detection age (3-day half-life).",
         },
         "weights": {

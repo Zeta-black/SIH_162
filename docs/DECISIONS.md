@@ -105,3 +105,28 @@ Newest at the bottom.
 - **Fake keys in tests are recognised structurally, not allowlisted** · a 32-hex
   string made of one repeated block is a placeholder; this way a new fake in a
   new test needs no scanner update · reverse in `scripts/smoke.mjs`.
+
+## Phase 3 — intelligence integrity
+
+- **Abnormality returns "not assessed" instead of a number when a location has
+  fewer than 2 prior detection days** · it was returning 1.0 ("maximally
+  unusual") for any location with no history, which hit 70% of detections and
+  was mostly archive sparsity, not genuine novelty · reverse by restoring the
+  old two-line `abnormality()` in `priority.py`.
+- **Unassessable priority components are dropped and the weights renormalised**
+  · a component we cannot measure must neither contribute a fabricated value nor
+  silently act as a zero · reverse in `compute_priority`.
+- **`abnormality_score` (0-100) is a first-class field, separate from
+  `model_score` and `operational_priority`** · what it is, how unusual it is and
+  how urgently to look are three different questions · reverse by removing it
+  from `PriorityResult` and the site payload.
+- **Accepted that priority scores fell** (mean 0.4403 → 0.3868, needs-attention
+  11 → 8) · the three sites that dropped out were ranked partly on an invented
+  novelty claim; a shorter honest queue beats a longer inflated one · reverse by
+  reverting the fix.
+- **Updated two existing tests that asserted the old behaviour** ·
+  `test_no_history_is_neutral` asserted `abnormality() == 0.5`, which encoded
+  the defect · reverse: see `git show` for the prior assertions.
+- **Did not retrain the model or touch the labels** · the defects were in the
+  scoring and presentation layers; changing the label policy would invalidate
+  the artefact and every metric with it.

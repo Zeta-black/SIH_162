@@ -125,6 +125,11 @@ class FireEvent:
     # must not collapse into one.
     distinct_days: int = 0
     history_available: bool = False
+    # Kept separate from priority_score on purpose: "how unusual" and "how
+    # urgently to look" are different questions. None = no baseline to judge
+    # against, which is the honest answer for most of this archive.
+    abnormality_score: int | None = None
+    abnormality_status: str = "assessed"
 
     risk_factors: list[str] = field(default_factory=list)
     detection_ids: list[str] = field(default_factory=list)
@@ -285,6 +290,8 @@ def _summarise(members: list[ClassifiedEvent]) -> FireEvent:
         persistent=any(m.evidence.recurrence.is_persistent for m in members),
         distinct_days=max((m.evidence.recurrence.distinct_days for m in members), default=0),
         history_available=any(m.evidence.recurrence.history_available for m in members),
+        abnormality_score=top.priority.abnormality_score,
+        abnormality_status=top.priority.abnormality_status,
         risk_factors=_risk_factors(members, top, spread, duration, frps, facility_holder),
         detection_ids=[m.event.event_id for m in members],
         lead_detection_id=lead.event.event_id,

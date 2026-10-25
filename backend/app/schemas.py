@@ -155,8 +155,34 @@ class Classification(BaseModel):
 class PriorityResult(BaseModel):
     score: float
     level: Literal["HIGH", "MEDIUM", "LOW"]
-    components: dict[str, float]
-    weights: dict[str, float]
+    components: dict[str, float] = Field(
+        description="Only the components that could be assessed for this event."
+    )
+    weights: dict[str, float] = Field(
+        description="Renormalised over the assessed components, so they sum to 1."
+    )
+    abnormality_status: Literal["assessed", "insufficient_history", "no_history_loaded"] = (
+        Field(
+            default="assessed",
+            description=(
+                "Whether this location had enough history for 'unusual' to mean "
+                "anything. Not a confidence value."
+            ),
+        )
+    )
+    abnormality_score: int | None = Field(
+        default=None,
+        description=(
+            "How unusual this detection is for this location, 0-100. None when "
+            "not assessed. Deliberately separate from the class and from the "
+            "priority: what it is, how unusual it is, and how urgently to look "
+            "are three different questions."
+        ),
+    )
+    unassessed: list[str] = Field(
+        default_factory=list,
+        description="Components that could not be measured and were excluded.",
+    )
 
 
 class Evidence(BaseModel):

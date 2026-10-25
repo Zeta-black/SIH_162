@@ -532,6 +532,19 @@ export function EvidenceDrawer({ site, provenance, model, disclaimer, onClose })
                   {site.operational_priority} · {site.priority_score?.toFixed(3)}
                 </dd>
 
+                {/* Abnormality is shown as its own row, never folded into the
+                    score. "Not assessed" is a real answer here and appears for
+                    most sites, because most locations in the archive have too
+                    little history for "unusual" to mean anything. */}
+                <dt>Abnormality for this site</dt>
+                <dd>
+                  {site.abnormality_score === null || site.abnormality_score === undefined
+                    ? site.abnormality_status === 'no_history_loaded'
+                      ? 'no history loaded'
+                      : 'not assessed — too little history here'
+                    : `${site.abnormality_score}/100`}
+                </dd>
+
                 <dt>Evidence completeness</dt>
                 <dd>
                   {site.evidence_completeness?.available}/{site.evidence_completeness?.total} checks

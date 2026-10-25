@@ -135,14 +135,29 @@ class TestProximityAndAbnormality:
     def test_no_facility_scores_zero(self):
         assert industrial_proximity(None) == 0.0
 
-    def test_persistent_source_is_less_abnormal(self, event, history_events):
-        persistent = HistoryIndex(history_events).compute(event)
-        novel = HistoryIndex([]).compute(event)
-        # A flare that burns daily should NOT outrank a brand-new hot spot.
-        assert abnormality(persistent) < abnormality(novel)
+    def test_persistent_source_is_assessed_as_unremarkable(self, event, history_events):
+        """A flare that burns daily must not outrank a novel hot spot.
 
-    def test_no_history_is_neutral(self, event):
-        assert abnormality(HistoryIndex([]).compute(event)) == 0.5
+        Updated for the D1 fix: abnormality now returns (value, status) and a
+        location with no history is reported as unassessable rather than being
+        handed a number. The comparison this test originally made — persistent
+        versus "novel" — could only be made because the novel case was being
+        given a fabricated 1.0. See docs/MODEL_AUDIT.md section 4.
+        """
+        value, status = abnormality(HistoryIndex(history_events).compute(event))
+        assert status == "assessed"
+        assert value < 0.5, "a source with real recurrence history is not abnormal"
+
+    def test_no_history_is_not_assessed_rather_than_neutral(self, event):
+        """Was `== 0.5`. A neutral number is still a number we cannot justify.
+
+        With nothing in the history window there is no baseline for "unusual" to
+        be unusual against, so the honest answer is that the component cannot be
+        scored at all — and compute_priority redistributes its weight.
+        """
+        value, status = abnormality(HistoryIndex([]).compute(event))
+        assert value is None
+        assert status == "no_history_loaded"
 
 
 class TestRecency:

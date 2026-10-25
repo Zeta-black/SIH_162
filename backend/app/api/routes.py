@@ -523,6 +523,8 @@ def _site(e) -> dict:
         "abstained": e.label == "UNKNOWN",
         "operational_priority": e.priority_level,
         "priority_score": e.priority_score,
+        "abnormality_score": e.abnormality_score,
+        "abnormality_status": e.abnormality_status,
         "detection_count": e.detection_count,
         "distinct_passes": e.distinct_passes,
         "distinct_days": e.distinct_days,
