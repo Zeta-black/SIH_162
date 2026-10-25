@@ -6,6 +6,18 @@ SIH 2026, PS 162. Written to be read aloud and followed click-by-click.
 `http://localhost:5173/?demo=1`, and `npm run prewarm` has been run on whatever
 network the venue has. See `DEMO_DAY_CHECKLIST.md`.
 
+**Bookmark these three links before the demo.** Each opens one exact site, so no
+step depends on where something happens to sit in a list:
+
+| | Link |
+|---|---|
+| A · Needs attention | `http://localhost:5173/?demo=1&site=FE-2026-43C5` |
+| B · Normal (routine flare) | `http://localhost:5173/?demo=1&site=FE-2026-4BA6` |
+| C · Not sure | `http://localhost:5173/?demo=1&site=FE-2026-66C8` |
+
+Clicking through the UI is the better demo — it shows the product working. The
+links are the Plan B for every step, and they never go stale.
+
 Everything below uses **real NASA FIRMS detections and real OpenStreetMap
 facilities** from the committed archive. Nothing in this script is simulated. If
 you say a number, it is on screen.
@@ -53,10 +65,14 @@ F5. The archive needs no network at all.
 
 ## 0:20 – 1:20 · The top event, and why
 
-**Click** the first row in *Needs attention first* (bottom-left):
-**ArcelorMittal Nippon Steel India**.
+**Type** `Arcelor` in the search box and pick the **second** result — the one
+marked *Needs attention* (the first is a different detection at the same plant).
 
 The map flies in, the card opens on the right.
+
+> Note: ArcelorMittal sits 5th in the *Needs attention first* list, not 1st —
+> the top entries are gas/oil infrastructure sites. Searching is both faster and
+> more reliable than counting rows. Plan B: open link **A** above.
 
 > "This is a steel plant at Hazira. Red, needs attention. And here is the reason
 > in one sentence —"
@@ -78,15 +94,16 @@ Then — and this is the part to slow down for — **point at the grey box**:
 > is not corroborated yet. No optical confirmation. We say that on the main
 > screen, not in a footnote."
 
-**Plan B** — if the card does not open: click the red marker on the map instead.
-If neither works, press F5 and use the search box: type `Arcelor`.
+**Plan B** — if the card does not open, click the red marker on the map. If that
+fails, open link **A**.
 
 ---
 
 ## 1:20 – 2:00 · The same plant, the opposite answer
 
-**Close the card** (× or Escape). **Click** the green marker about two
-centimetres away — or search `Arcelor` and pick the second result.
+**Close the card** (× or Escape). **Search** `Arcelor` again and pick the
+**third** result — the one marked *Normal*. Or click the green marker a couple of
+centimetres from the red one. Plan B: open link **B** above.
 
 > "Same plant. Two hundred and thirty metres away. Nine days later."
 
@@ -120,6 +137,7 @@ Say the two numbers, 36 MW normal versus 4 MW flagged, and move on.
 ## 2:00 – 2:30 · When we do not know
 
 **Search** `coal` and pick **Block - B coal mine** — or click any grey marker.
+Plan B: open link **C** above.
 
 > "Grey. Not sure. The model's leading class scored 0.443, and our reporting
 > threshold is 0.45. It did not clear the bar, so we do not publish a guess."

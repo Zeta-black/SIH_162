@@ -223,7 +223,7 @@ next step for this project.
 ```bash
 cd backend
 .venv/Scripts/python.exe -m ml.validate      # baselines + circularity check
-.venv/Scripts/python.exe -m pytest -q        # 332 tests
+.venv/Scripts/python.exe -m pytest -q        # 353 tests
 ```
 
 Model metrics come from the committed artefact; retraining is

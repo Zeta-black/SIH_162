@@ -73,7 +73,7 @@ Four ways, none of which is "we trusted the metric":
 2. **Baseline comparison.** `backend/ml/validate.py` fits a depth-3 tree and a
    logistic regression on the same split. They score comparably — which is how
    we know the metric reflects the policy, not model skill.
-3. **Behavioural tests.** 332 automated tests, including ones asserting that an
+3. **Behavioural tests.** 353 automated tests, including ones asserting that an
    abstained event is never shown as a confident alarm, that a replay is never
    labelled live, and that a rejected API key still puts data on the map.
 4. **The evidence gate, measured.** On a live India-wide query in September —
@@ -267,7 +267,7 @@ starts both halves, pre-warms the archive and opens a browser. Roughly 20
 seconds if dependencies are already installed.
 
 `npm run smoke` runs the full quality gate — 50 checks across secrets, build,
-332 unit tests, every API route, the degradation matrix, and a real browser pass
+353 unit tests, every API route, the degradation matrix, and a real browser pass
 with axe accessibility.
 
 ---

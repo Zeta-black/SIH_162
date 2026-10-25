@@ -475,11 +475,32 @@ def _provenance(requested_mode: str, status, n_events: int) -> dict:
     }
 
 
+# Facility "names" that are really category labels, so a site titled with one of
+# them is an unnamed OSM feature rather than an identified plant.
+_GENERIC_FACILITY_LABELS = set(FACILITY_LABELS.values())
+
+
 def _coord_title(lat: float, lon: float) -> str:
     """A readable, unique identity for a site with no mapped facility."""
     ns = "N" if lat >= 0 else "S"
     ew = "E" if lon >= 0 else "W"
     return f"{abs(lat):.3f}°{ns}, {abs(lon):.3f}°{ew}"
+
+
+def _title(e, facility: str | None, near: bool) -> str:
+    """A name an operator can tell apart from the one above it in the queue.
+
+    Many OpenStreetMap industrial features have no `name` tag, so the context
+    layer falls back to the category label. Three unnamed gas/oil features then
+    produced three rows all reading "Gas / oil infrastructure", which is useless
+    as a work list. When the name is a generic category label rather than a real
+    one, the position is appended to disambiguate.
+    """
+    if not (facility and near):
+        return _coord_title(e.latitude, e.longitude)
+    if facility in _GENERIC_FACILITY_LABELS:
+        return f"{facility} · {_coord_title(e.latitude, e.longitude)}"
+    return facility
 
 
 def _subtitle(e, facility: str | None, near: bool) -> str:
@@ -510,7 +531,7 @@ def _site(e) -> dict:
         # Nothing here invents a place name. Naming the unnamed ones after their
         # class produced 150 identical "Unclassified" rows in the queue, which
         # told the operator nothing; coordinates at least identify the site.
-        "title": facility if (facility and near) else _coord_title(e.latitude, e.longitude),
+        "title": _title(e, facility, near),
         "subtitle": _subtitle(e, facility, near),
         "verdict": verdict_service.verdict_sentence(e),
         "why": verdict_service.why_bullets(e),

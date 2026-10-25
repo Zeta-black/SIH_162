@@ -42,8 +42,11 @@ is cheap to prevent and expensive to fix in the room.
 - [ ] **Load the page once and let the map fully draw.** OpenStreetMap throttles
       rapid tile fetching, and this puts the tiles in the browser cache so the
       basemap is instant in the room.
-- [ ] **Click through the three demo sites once** so the backend has them warm:
-      ArcelorMittal (red), ArcelorMittal (green), Block - B coal mine (grey).
+- [ ] **Click through the three demo sites once** so the backend has them warm.
+      Use the exact links, then bookmark them:
+      - `?demo=1&site=FE-2026-43C5` — ArcelorMittal, Needs attention
+      - `?demo=1&site=FE-2026-4BA6` — ArcelorMittal, Normal (the 36 MW flare)
+      - `?demo=1&site=FE-2026-66C8` — Block - B coal mine, Not sure
 - [ ] **Close everything else** — Slack, email, other browser profiles, anything
       that can raise a notification.
 - [ ] **Turn off notifications** (Windows: Focus assist → Alarms only).

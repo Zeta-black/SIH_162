@@ -7,7 +7,8 @@ evidence behind it and an honest status.
 
 Status meanings:
 - **Verified** — measured or tested on this machine; the command is given and
-  re-runnable.
+  re-runnable. Where a figure varies between runs, the range is given, not the
+  best observation.
 - **Partly** — true with a stated caveat that must be said alongside it.
 - **Not verified** — we believe it but have not established it. Do not assert.
 
@@ -84,9 +85,9 @@ Python 3.11.9, from branch `sih-final`.
 
 | # | Claim | Evidence | Status |
 |---|---|---|---|
-| E1 | App interactive in ~1.5 s | Smoke group 7: 1,510 ms | **Verified** |
-| E2 | First contentful paint ~1.0 s | Smoke group 7: 1,072 ms | **Verified** |
-| E3 | `/api/map` responds in ~210 ms warm | Smoke group 4: 211 ms | **Verified** |
+| E1 | App interactive in 1.5-3.2 s | Smoke group 7 across four runs: 1,510 / 2,030 / 3,155 ms. The spread is real — the higher figures are from runs where the 353-test suite was competing for the same machine. Quote the range, not the best number | **Verified** |
+| E2 | First contentful paint 0.8-1.6 s | Smoke group 7 across four runs: 836 / 1,072 / 1,568 / 1,644 ms | **Verified** |
+| E3 | `/api/map` responds in 210-425 ms warm | Smoke group 4 across runs: 211 / 293 / 423 ms | **Verified** |
 | E4 | 11 of 13 API routes respond under 70 ms warm | Smoke group 4 timings | **Verified** |
 | E5 | Zero console errors | Smoke group 7 | **Verified** |
 | E6 | No critical or serious WCAG 2 A/AA violations | axe-core: 20 rules passed, 0 violations | **Verified** |
@@ -101,7 +102,7 @@ Python 3.11.9, from branch `sih-final`.
 
 | # | Claim | Evidence | Status |
 |---|---|---|---|
-| F1 | 332 automated tests pass | `cd backend && .venv/Scripts/python.exe -m pytest -q` → `332 passed` in 172 s | **Verified** |
+| F1 | 353 automated tests pass | `cd backend && .venv/Scripts/python.exe -m pytest -q` → `353 passed` in 211 s | **Verified** |
 | F2 | The quality gate is 50/50 green | `npm run smoke` → `SMOKE PASS 50/50` | **Verified** |
 | F3 | Production build succeeds, lint clean | Smoke group 2 | **Verified** |
 | F4 | No secrets are committed | Smoke group 1 (4/4) | **Verified for the current tree.** A real key exists in commit `8d39ff8` on this local branch — see the note below |

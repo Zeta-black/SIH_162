@@ -83,8 +83,8 @@ cropped from real screenshots.
 when we cannot. A replay is never allowed to look like live data. Verified with
 a deliberately wrong API key and with no network at all.
 
-**Numbers:** interactive 1.5 s, FCP 1.07 s, 332 tests, smoke 50/50 (claims E1,
-E2, F1, F2).
+**Numbers:** interactive 1.5-3.2 s, FCP under 1.7 s, 353 tests, smoke 50/50
+(claims E1, E2, F1, F2).
 
 ---
 

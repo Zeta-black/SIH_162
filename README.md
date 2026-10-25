@@ -72,7 +72,7 @@ read server-side only and never reaches the browser.
 | `npm run demo:offline` | Forces the offline archive. Never touches the network |
 | `npm run prewarm` | Warms the caches before a demo and reports what it found |
 | `npm run smoke` | Full quality gate — 50 checks, starts its own servers |
-| `npm test` | 332 backend tests |
+| `npm test` | 353 backend tests |
 
 Windows users can double-click `demo.bat`, or run `.\demo.ps1 -Offline`.
 
@@ -163,10 +163,13 @@ Read this section before believing anything else in this file.
 - **Coverage is not national.** The archive holds 1,482 facilities across six
   regions (Jamnagar, Hazira, Singrauli, Korba, central Punjab, Similipal). The
   map frames the data we have rather than an India-wide box, deliberately.
-- **Abnormality is not yet a validated per-facility baseline.** It currently
-  reads "no prior detection here" as "unusual", which conflates a quiet site
-  with a site we have no coverage of (`docs/BASELINE.md` D1). The interface
-  therefore makes no "N times the normal range" claims.
+- **Abnormality can only be assessed for 4% of sites.** A location needs at
+  least two prior detection days before "unusual for this site" means anything,
+  and only 16 of 390 archive sites clear that bar. The rest honestly report
+  "not assessed — too little history here" rather than being handed a number.
+  The interface therefore makes no "N times the normal range" claims. Fixing
+  this needs a denser archive, not more code
+  (`docs/MODEL_AUDIT.md` §5).
 - **Land cover is unavailable for roughly half the detections** — OpenStreetMap
   has no land-use polygon there. Reported as "not mapped", never guessed.
 - **No optical confirmation.** Sentinel-2 is not integrated. Every event's

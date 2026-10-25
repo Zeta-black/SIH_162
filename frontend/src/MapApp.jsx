@@ -31,21 +31,36 @@ import './map.css'
 const INDIA_BBOX = '68.0,6.5,97.5,36.0'
 const POLL_MS = 5 * 60 * 1000
 
+/**
+ * Read a query parameter from either side of the hash.
+ *
+ * Under a HashRouter people reliably type `#/?demo=1`, which never reaches
+ * `window.location.search`, while a pasted link is usually `?demo=1#/`. Both
+ * have to work or the offline switch silently does nothing.
+ */
+function readParam(key) {
+  if (typeof window === 'undefined') return null
+  const hash = window.location.hash
+  const inHash = hash.includes('?') ? hash.slice(hash.indexOf('?')) : ''
+  return new URLSearchParams(window.location.search).get(key) ?? new URLSearchParams(inHash).get(key)
+}
+
 export default function MapApp() {
   const [mode, setMode] = useState(() => {
-    // ?demo=1 forces the offline archive, for a venue with no usable Wi-Fi.
-    // Accepted both before the hash (?demo=1#/) and inside it (#/?demo=1),
-    // because under a HashRouter people reliably type the second form and it
-    // never reaches window.location.search.
-    const hash = window.location.hash
-    const inHash = hash.includes('?') ? hash.slice(hash.indexOf('?')) : ''
-    const params = new URLSearchParams(window.location.search || inHash)
-    const hashParams = new URLSearchParams(inHash)
-    const get = (k) => params.get(k) ?? hashParams.get(k)
+    const get = readParam
     if (get('demo') === '1') return 'demo'
     if (get('live') === '1') return 'live'
     return 'auto'
   })
+
+  /* ?site=FE-2026-43C5 opens that exact site.
+   *
+   * Added because a demo script that says "click the first row" is a script
+   * that breaks the moment the ranking changes — and the ranking changed the
+   * day the abnormality fix landed. A link is also the natural way an operator
+   * hands a colleague a specific event. */
+  const [deepLinkSite] = useState(() => readParam('site'))
+  const deepLinkDone = useRef(false)
   const [days, setDays] = useState(1)
   const [data, setData] = useState(null)
   const [error, setError] = useState(null)
@@ -160,6 +175,16 @@ export default function MapApp() {
     },
     [sites],
   )
+
+  // Open the deep-linked site as soon as the data it refers to exists.
+  useEffect(() => {
+    if (deepLinkDone.current || !deepLinkSite || !sites.length) return
+    const match = sites.find((s) => s.id === deepLinkSite)
+    if (!match) return
+    deepLinkDone.current = true
+    setSelectedId(match.id)
+    setFlyTo({ lat: match.lat, lon: match.lon, zoom: 12, k: Date.now() })
+  }, [deepLinkSite, sites])
 
   const onPickResult = useCallback(
     (r) => {
