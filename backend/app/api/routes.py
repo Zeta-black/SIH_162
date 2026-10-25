@@ -30,6 +30,7 @@ from app.services import firms as firms_service
 from app.services import landcover as landcover_service
 from app.services import osm as osm_service
 from app.services import pipeline, replay as replay_service, snapshot as snapshot_service
+from app.services import verdict as verdict_service
 from app.services.classifier import DISCLAIMER, get_classifier
 from app.services.geo import GridPoint, SpatialGrid, bbox_around, haversine_km, parse_bbox
 from app.services.labeling import policy_summary
@@ -43,8 +44,13 @@ from app.taxonomy import (
     CLASS_COLORS,
     CLASS_DESCRIPTIONS,
     CLASS_LABELS,
+    DISPLAY_STATUSES,
     FACILITY_LABELS,
     LAND_COVER_LABELS,
+    STATUS_COLORS,
+    STATUS_LABELS,
+    STATUS_MEANINGS,
+    STATUS_RANK,
     TRAINED_CLASSES,
 )
 
@@ -400,6 +406,265 @@ class IncidentAction(BaseModel):
     action: str
     actor: str = "operator"
     note: str | None = None
+
+
+# ---------------------------------------------------------------------------
+# Map — the single screen
+# ---------------------------------------------------------------------------
+# One request serves the whole main screen. It returns grouped sites rather
+# than raw pixels, the four-word display status for each, and a provenance
+# block that names exactly which of the five data states the screen is in.
+#
+# Deliberately lean: `model` and `disclaimer` are identical on every event, so
+# they are hoisted to the envelope instead of repeated per site (that
+# duplication alone was ~320 KB of the old 1.46 MB /api/hotspots payload).
+
+
+def _provenance(requested_mode: str, status, n_events: int) -> dict:
+    """Name the data state. Never ambiguous, never flattering.
+
+    Five states, matching what the UI chip can render:
+      live        — fetched from NASA now, detections present
+      live_empty  — fetched from NASA now, genuinely nothing in the window
+      offline     — a live attempt failed, so saved data is on screen
+      replay      — the frozen historical archive, chosen deliberately
+      unavailable — nothing to show at all
+    """
+    if status is None:
+        return {
+            "state": "unavailable",
+            "label": "No data",
+            "detail": "The analysis returned no status block.",
+            "is_live": False,
+        }
+
+    resolved = status.mode
+    firms = status.firms_status
+
+    if resolved == "live":
+        if firms == "ok" and n_events > 0:
+            state, label = "live", "Live · NASA FIRMS"
+        elif firms == "no_data":
+            state, label = "live_empty", "Live · no detections in window"
+        else:
+            # Live was requested explicitly and failed, and explicit live mode
+            # does not fall back. Say so plainly rather than showing an empty
+            # map under a "Live" badge.
+            state, label = "unavailable", "Live feed unavailable"
+    else:
+        if requested_mode == "demo":
+            state, label = "replay", "Replay · real historical detections"
+        elif firms in ("unavailable", "not_configured", "rate_limited"):
+            state, label = "offline", "Offline · showing saved data"
+        elif firms == "unavailable" or not status.firms_products_used:
+            state, label = "offline", "Offline · showing saved data"
+        else:
+            state, label = "replay", "Replay · real historical detections"
+
+    return {
+        "state": state,
+        "label": label,
+        "detail": status.firms_message,
+        "is_live": state == "live",
+        "source": "NASA FIRMS",
+        "products": status.firms_products_used,
+        "geographic_context": status.osm_message,
+        # Observation time and retrieval time are different facts and are kept
+        # apart everywhere. `retrieved_at` is when FIRETRACE asked; the per-site
+        # `observed_at` is when the satellite saw it.
+        "retrieved_at": status.last_updated.isoformat() if status.last_updated else None,
+        "archive_note": status.snapshot_note,
+    }
+
+
+def _coord_title(lat: float, lon: float) -> str:
+    """A readable, unique identity for a site with no mapped facility."""
+    ns = "N" if lat >= 0 else "S"
+    ew = "E" if lon >= 0 else "W"
+    return f"{abs(lat):.3f}°{ns}, {abs(lon):.3f}°{ew}"
+
+
+def _subtitle(e, facility: str | None, near: bool) -> str:
+    """Where this is, relative to mapped industry. Never implies causation."""
+    if facility and near:
+        if e.nearest_facility_km is not None and e.nearest_facility_km > 0.75:
+            return f"{e.nearest_facility_km:.2f} km from {facility}"
+        return f"On the {facility} site"
+    if e.nearest_facility_km is not None:
+        return f"{e.label_display} · {e.nearest_facility_km:.1f} km from {facility or 'mapped industry'}"
+    return f"{e.label_display} · no mapped facility within range"
+
+
+def _site(e) -> dict:
+    """One grouped site, trimmed to what the main screen actually renders."""
+    status_key = verdict_service.display_status(e)
+    facility = e.nearest_facility_name
+    near = e.nearest_facility_km is not None and e.nearest_facility_km <= 3.0
+
+    return {
+        "id": e.event_id,
+        "lat": e.latitude,
+        "lon": e.longitude,
+        "status": status_key,
+        "status_label": STATUS_LABELS[status_key],
+        # No reverse geocoding is available, so a site is named after the mapped
+        # facility when there is one and after its position when there is not.
+        # Nothing here invents a place name. Naming the unnamed ones after their
+        # class produced 150 identical "Unclassified" rows in the queue, which
+        # told the operator nothing; coordinates at least identify the site.
+        "title": facility if (facility and near) else _coord_title(e.latitude, e.longitude),
+        "subtitle": _subtitle(e, facility, near),
+        "verdict": verdict_service.verdict_sentence(e),
+        "why": verdict_service.why_bullets(e),
+        "missing": verdict_service.missing_evidence(e),
+        "evidence_completeness": verdict_service.evidence_completeness(e),
+        # Classification and score stay separate and separately labelled.
+        "predicted_class": e.label,
+        "predicted_class_display": e.label_display,
+        "model_score": e.label_confidence,
+        "abstained": e.label == "UNKNOWN",
+        "operational_priority": e.priority_level,
+        "priority_score": e.priority_score,
+        "detection_count": e.detection_count,
+        "distinct_passes": e.distinct_passes,
+        "distinct_days": e.distinct_days,
+        "history_available": e.history_available,
+        "persistent": e.persistent,
+        "frp_max_mw": e.frp_max_mw,
+        "frp_total_mw": e.frp_total_mw,
+        "brightness_max_k": e.brightness_max_k,
+        "nearest_facility_name": facility,
+        "nearest_facility_km": e.nearest_facility_km,
+        "land_cover": e.land_cover,
+        "observed_at": e.last_detected.isoformat(),
+        "first_observed_at": e.first_detected.isoformat(),
+        "products": e.products,
+        "lead_detection_id": e.lead_detection_id,
+    }
+
+
+@router.get("/api/map", tags=["map"])
+def map_view(
+    bbox: str | None = Query(None),
+    days: int = Query(settings.firms_default_day_range, ge=1, le=5),
+    mode: str = Query("auto", pattern="^(auto|live|demo)$"),
+    limit: int = Query(1000, ge=1, le=2000),
+) -> dict:
+    """Everything the main screen needs, in one request."""
+    try:
+        result = pipeline.run_analysis(bbox, days=days, mode=mode)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+    grouped = events_service.cluster(result.events)
+    sites = [_site(e) for e in grouped]
+
+    counts = {key: 0 for key in DISPLAY_STATUSES}
+    for s in sites:
+        counts[s["status"]] += 1
+
+    # Triage order: needs attention first, then unresolved, then by priority.
+    sites.sort(key=lambda s: (STATUS_RANK[s["status"]], -s["priority_score"]))
+
+    model = get_classifier().info()
+    return {
+        "provenance": _provenance(mode, result.status, len(result.events)),
+        "counts": {**counts, "sites": len(sites), "detections": len(result.events)},
+        "status_vocabulary": [
+            {
+                "key": k,
+                "label": STATUS_LABELS[k],
+                "meaning": STATUS_MEANINGS[k],
+                "color": STATUS_COLORS[k],
+            }
+            for k in DISPLAY_STATUSES
+        ],
+        "window": {
+            "days_requested": days,
+            "observed_from": min((s["first_observed_at"] for s in sites), default=None),
+            "observed_to": max((s["observed_at"] for s in sites), default=None),
+        },
+        "model": {
+            "model_version": model.model_version,
+            "algorithm": model.algorithm,
+            "n_features": model.n_features,
+            "loaded": model.loaded,
+            "score_note": (
+                "model_score is an uncalibrated Random Forest vote share for the "
+                "leading trained class. It is not a probability of correctness."
+            ),
+        },
+        "disclaimer": DISCLAIMER,
+        "sites": sites[:limit],
+        "truncated": max(0, len(sites) - limit),
+    }
+
+
+@router.get("/api/map/search", tags=["map"])
+def map_search(
+    q: str = Query(..., min_length=2, max_length=80),
+    bbox: str | None = Query(None),
+    days: int = Query(settings.firms_default_day_range, ge=1, le=5),
+    mode: str = Query("auto", pattern="^(auto|live|demo)$"),
+    limit: int = Query(6, ge=1, le=20),
+) -> dict:
+    """Search mapped industrial facilities and the sites currently on screen.
+
+    Scope is deliberately narrow and stated in the UI placeholder: this searches
+    real OpenStreetMap facility names and the current sites. It is not a
+    geocoder — there is no place-name database behind it, and offering one
+    would mean most Indian city names returning nothing.
+    """
+    needle = q.strip().lower()
+    try:
+        result = pipeline.run_analysis(bbox, days=days, mode=mode)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+    hits: list[dict] = []
+    seen: set[str] = set()
+
+    # Sites first: a match the user can act on immediately beats a bare facility.
+    for e in events_service.cluster(result.events):
+        name = e.nearest_facility_name or ""
+        if needle not in name.lower() and needle not in e.label_display.lower():
+            continue
+        key = f"site:{e.event_id}"
+        if key in seen:
+            continue
+        seen.add(key)
+        status_key = verdict_service.display_status(e)
+        hits.append({
+            "kind": "site",
+            "id": e.event_id,
+            "name": name or e.label_display,
+            "detail": STATUS_LABELS[status_key],
+            "status": status_key,
+            "lat": e.latitude,
+            "lon": e.longitude,
+        })
+
+    # Then mapped facilities with no current detection. Being explicit that
+    # there is no activity is useful information, not an empty result.
+    for f in result.facilities:
+        if not f.name or needle not in f.name.lower():
+            continue
+        key = f"fac:{f.facility_id}"
+        if key in seen:
+            continue
+        seen.add(key)
+        hits.append({
+            "kind": "facility",
+            "id": f.facility_id,
+            "name": f.name,
+            "detail": f"{f.category_label} · no detection in this window",
+            "status": None,
+            "lat": f.latitude,
+            "lon": f.longitude,
+        })
+
+    hits.sort(key=lambda h: (h["kind"] != "site", len(h["name"])))
+    return {"query": q, "results": hits[:limit], "total_matches": len(hits)}
 
 
 @router.get("/api/incidents", tags=["incidents"])

@@ -81,6 +81,11 @@ export const api = {
   summary: (params) => request(`/api/dashboard/summary${query(params)}`),
   scenarios: () => request('/api/scenarios'),
 
+  // The main screen is served by exactly one request, so the summary counts,
+  // the markers and the provenance chip can never disagree with each other.
+  map: (params, options = {}) => request(`/api/map${query(params)}`, options),
+  mapSearch: (params) => request(`/api/map/search${query(params)}`),
+
   // Demo replay. `run` executes the real backend pipeline on a historical
   // case; it is a POST because it writes detections and incidents.
   replayCatalogue: (params) => request(`/api/replay/catalogue${query(params ?? {})}`),

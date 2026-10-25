@@ -119,6 +119,12 @@ class FireEvent:
     nearest_facility_km: float | None
     land_cover: str
     persistent: bool
+    # How many distinct prior days this location was detected on, and whether a
+    # history window was actually loaded. The verdict layer needs both: "no
+    # prior detections" and "no history to check" are different statements and
+    # must not collapse into one.
+    distinct_days: int = 0
+    history_available: bool = False
 
     risk_factors: list[str] = field(default_factory=list)
     detection_ids: list[str] = field(default_factory=list)
@@ -277,6 +283,8 @@ def _summarise(members: list[ClassifiedEvent]) -> FireEvent:
             statistics.mode(land_covers) if land_covers else "Not mapped in OpenStreetMap"
         ),
         persistent=any(m.evidence.recurrence.is_persistent for m in members),
+        distinct_days=max((m.evidence.recurrence.distinct_days for m in members), default=0),
+        history_available=any(m.evidence.recurrence.history_available for m in members),
         risk_factors=_risk_factors(members, top, spread, duration, frps, facility_holder),
         detection_ids=[m.event.event_id for m in members],
         lead_detection_id=lead.event.event_id,
@@ -294,8 +302,15 @@ def _risk_factors(members, top, spread, duration, frps, facility_holder) -> list
     count = len(members)
 
     if count > 1:
-        window = f"{duration:.1f} h" if duration >= 1 else f"{duration * 60:.0f} min"
-        reasons.append(f"{count} satellite detections over {window}")
+        minutes = duration * 60
+        if duration >= 1:
+            reasons.append(f"{count} satellite detections over {duration:.1f} h")
+        elif minutes >= 1:
+            reasons.append(f"{count} satellite detections over {minutes:.0f} min")
+        else:
+            # Same overpass: several adjacent hot pixels, not a span of time.
+            # Rendering this as "over 0 min" was wrong on 54 of 390 sites.
+            reasons.append(f"{count} adjacent hot pixels in a single overpass")
     else:
         reasons.append("Single detection — no corroborating pass yet")
 

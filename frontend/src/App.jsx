@@ -1,5 +1,5 @@
 import { createContext, useCallback, useContext, useMemo, useState } from 'react'
-import { HashRouter, NavLink, Navigate, Route, Routes } from 'react-router-dom'
+import { NavLink, Navigate, Route, Routes } from 'react-router-dom'
 import { api } from './api.js'
 import { buildClassMap } from './lib/classes.js'
 import { useApi } from './lib/useApi.js'
@@ -46,13 +46,13 @@ export const REGIONS = [
 ]
 
 const NAV = [
-  { to: '/ops', label: 'Overview', Icon: IconGauge, title: 'Current operational picture' },
-  { to: '/incidents', label: 'Alerts', Icon: IconAlert, title: 'Alert queue and response workflow' },
-  { to: '/explore', label: 'Map', Icon: IconMap, title: 'India-focused geospatial workspace' },
-  { to: '/replay', label: 'Replay', Icon: IconReplay, title: 'Replay a historical event through the pipeline' },
-  { to: '/model', label: 'Model', Icon: IconModel, title: 'Model evidence and limitations' },
-  { to: '/data', label: 'History', Icon: IconData, title: 'Historical source provenance' },
-  { to: '/method', label: 'System', Icon: IconMethod, title: 'Processing chain, policy, and limits' },
+  { to: '/analytics/ops', label: 'Overview', Icon: IconGauge, title: 'Current operational picture' },
+  { to: '/analytics/incidents', label: 'Alerts', Icon: IconAlert, title: 'Alert queue and response workflow' },
+  { to: '/analytics/explore', label: 'Map', Icon: IconMap, title: 'India-focused geospatial workspace' },
+  { to: '/analytics/replay', label: 'Replay', Icon: IconReplay, title: 'Replay a historical event through the pipeline' },
+  { to: '/analytics/model', label: 'Model', Icon: IconModel, title: 'Model evidence and limitations' },
+  { to: '/analytics/data', label: 'History', Icon: IconData, title: 'Historical source provenance' },
+  { to: '/analytics/method', label: 'System', Icon: IconMethod, title: 'Processing chain, policy, and limits' },
 ]
 
 function SourceChip({ status, error, loading }) {
@@ -255,6 +255,9 @@ function Shell({ children }) {
 
         <div className="masthead-gap" />
         <div className="masthead-stat">
+          <NavLink to="/" end title="Back to the map" style={{ marginRight: 10 }}>
+            <span>&larr; Map</span>
+          </NavLink>
           <SourceChip status={status} error={statusError} loading={statusLoading} />
         </div>
       </header>
@@ -367,24 +370,22 @@ export default function App() {
   if (meta.loading || meta.error) return <Boot error={meta.error} onRetry={meta.reload} />
 
   return (
-    <HashRouter>
-      <MetaContext.Provider value={{ meta: meta.data, classMap }}>
-        <QueryContext.Provider value={value}>
-          <Shell>
-            <Routes>
-              <Route path="/" element={<Navigate to="/ops" replace />} />
-              <Route path="/ops" element={<Operations />} />
-              <Route path="/incidents" element={<Incidents />} />
-              <Route path="/explore" element={<Explore />} />
-              <Route path="/model" element={<Model />} />
-              <Route path="/data" element={<DataSources />} />
-              <Route path="/method" element={<Method />} />
-              <Route path="/replay" element={<Replay />} />
-              <Route path="*" element={<Navigate to="/ops" replace />} />
-            </Routes>
-          </Shell>
-        </QueryContext.Provider>
-      </MetaContext.Provider>
-    </HashRouter>
+    <MetaContext.Provider value={{ meta: meta.data, classMap }}>
+      <QueryContext.Provider value={value}>
+        <Shell>
+          <Routes>
+            <Route index element={<Navigate to="ops" replace />} />
+            <Route path="ops" element={<Operations />} />
+            <Route path="incidents" element={<Incidents />} />
+            <Route path="explore" element={<Explore />} />
+            <Route path="model" element={<Model />} />
+            <Route path="data" element={<DataSources />} />
+            <Route path="method" element={<Method />} />
+            <Route path="replay" element={<Replay />} />
+            <Route path="*" element={<Navigate to="ops" replace />} />
+          </Routes>
+        </Shell>
+      </QueryContext.Provider>
+    </MetaContext.Provider>
   )
 }

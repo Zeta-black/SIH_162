@@ -178,3 +178,62 @@ CONFIDENCE_LOW = "LOW"
 PRIORITY_HIGH = "HIGH"
 PRIORITY_MEDIUM = "MEDIUM"
 PRIORITY_LOW = "LOW"
+
+
+# ---------------------------------------------------------------------------
+# Display status — the only status vocabulary the main screen ever shows.
+#
+# Four words, chosen so a plant safety officer knows what to do next without a
+# glossary. The finer-grained internal states (five classes x three priority
+# levels x an abstention flag) are mapped down to these for display only; the
+# detailed fields stay on the event for the evidence drawer.
+#
+# Deliberately NOT derived from colour alone — every surface pairs the colour
+# with this text label and a distinct marker shape.
+# ---------------------------------------------------------------------------
+STATUS_NEEDS_ATTENTION = "needs_attention"
+STATUS_WATCH = "watch"
+STATUS_NORMAL = "normal"
+STATUS_NOT_SURE = "not_sure"
+
+DISPLAY_STATUSES: list[str] = [
+    STATUS_NEEDS_ATTENTION,
+    STATUS_WATCH,
+    STATUS_NORMAL,
+    STATUS_NOT_SURE,
+]
+
+STATUS_LABELS: dict[str, str] = {
+    STATUS_NEEDS_ATTENTION: "Needs attention",
+    STATUS_WATCH: "Watch",
+    STATUS_NORMAL: "Normal",
+    STATUS_NOT_SURE: "Not sure",
+}
+
+STATUS_MEANINGS: dict[str, str] = {
+    STATUS_NEEDS_ATTENTION: (
+        "Clearly unusual for this location, or a likely industrial incident."
+    ),
+    STATUS_WATCH: "Somewhat above the usual pattern, or weak evidence of a change.",
+    STATUS_NORMAL: "Consistent with the usual behaviour recorded at this location.",
+    STATUS_NOT_SURE: "Evidence is insufficient or contradictory. Not classified.",
+}
+
+# Status colours. Red/amber/green plus a neutral grey, each paired everywhere
+# with its text label and a distinct marker shape so the map never depends on
+# colour alone (WCAG 1.4.1).
+STATUS_COLORS: dict[str, str] = {
+    STATUS_NEEDS_ATTENTION: "#c0362c",
+    STATUS_WATCH: "#b7791f",
+    STATUS_NORMAL: "#2f855a",
+    STATUS_NOT_SURE: "#6b7280",
+}
+
+# Sort weight for the "Needs attention" list. Not a severity score — purely the
+# order a triage desk should walk the queue in.
+STATUS_RANK: dict[str, int] = {
+    STATUS_NEEDS_ATTENTION: 0,
+    STATUS_NOT_SURE: 1,
+    STATUS_WATCH: 2,
+    STATUS_NORMAL: 3,
+}

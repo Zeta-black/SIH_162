@@ -1,0 +1,845 @@
+/* FIRETRACE — the main screen.
+ *
+ * A separate stylesheet from styles.css on purpose. styles.css is an explicit
+ * SCADA/HMI console: dense, square, monospaced, information-first. That is the
+ * right language for the analytics pages and the wrong one for the screen a
+ * judge or a safety officer opens first.
+ *
+ * Reference point here is a consumer map: a calm light surface, floating cards,
+ * one thing emphasised at a time, detail on demand.
+ *
+ * Rules this file follows:
+ *   - Light by default. The map is the page; everything else floats over it.
+ *   - At most five numbers visible at once.
+ *   - Colour carries status, never decoration. No gradients, no glass, no glow.
+ *   - Motion only to explain a state change, <=200ms, off under reduced-motion.
+ *   - Every status colour is paired with a text label and a marker shape, so
+ *     nothing depends on colour alone.
+ */
+
+@import 'leaflet/dist/leaflet.css';
+
+:root {
+  /* Surfaces */
+  --m-surface: #ffffff;
+  --m-surface-2: #f7f8fa;
+  --m-surface-sunk: #f1f3f6;
+  --m-border: #e3e6ea;
+  --m-border-strong: #c9ced6;
+
+  /* Ink — AA against --m-surface at the sizes used here */
+  --m-ink: #1a1d21;
+  --m-ink-2: #4a5059;
+  --m-ink-3: #6b727c;
+
+  /* One brand accent. Used for focus, links and the active control. */
+  --m-accent: #1a5fb4;
+  --m-accent-ink: #14487f;
+  --m-accent-wash: #eaf1fa;
+
+  /* The four display statuses. Mirrors backend/app/taxonomy.py STATUS_COLORS —
+     the backend sends these too, and these are the fallback. */
+  --m-attn: #c0362c;
+  --m-attn-wash: #fdeeec;
+  --m-watch: #b7791f;
+  --m-watch-wash: #fdf5e7;
+  --m-normal: #2f855a;
+  --m-normal-wash: #ebf7f0;
+  --m-unsure: #6b7280;
+  --m-unsure-wash: #f2f3f5;
+
+  /* Type: one family, fixed scale. */
+  --m-font: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+  --m-t-xs: 12px;
+  --m-t-sm: 14px;
+  --m-t-md: 16px;
+  --m-t-lg: 20px;
+  --m-t-xl: 28px;
+
+  /* 8px spacing grid */
+  --m-s1: 4px;
+  --m-s2: 8px;
+  --m-s3: 12px;
+  --m-s4: 16px;
+  --m-s5: 24px;
+  --m-s6: 32px;
+
+  --m-r-sm: 8px;
+  --m-r: 12px;
+  --m-r-lg: 16px;
+
+  --m-shadow: 0 1px 2px rgba(16, 24, 40, 0.06), 0 4px 12px rgba(16, 24, 40, 0.08);
+  --m-shadow-lg: 0 2px 4px rgba(16, 24, 40, 0.06), 0 12px 32px rgba(16, 24, 40, 0.12);
+
+  --m-ease: cubic-bezier(0.2, 0, 0.2, 1);
+}
+
+/* ----------------------------------------------------------------- shell */
+.mapapp {
+  position: fixed;
+  inset: 0;
+  font-family: var(--m-font);
+  font-size: var(--m-t-sm);
+  color: var(--m-ink);
+  background: var(--m-surface-sunk);
+  -webkit-font-smoothing: antialiased;
+}
+
+.mapapp *:focus-visible {
+  outline: 2px solid var(--m-accent);
+  outline-offset: 2px;
+  border-radius: var(--m-r-sm);
+}
+
+.mapapp button,
+.mapapp input {
+  font: inherit;
+}
+
+/* The map fills the viewport; every panel floats above it. */
+.m-canvas {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+}
+
+.m-canvas .leaflet-container {
+  width: 100%;
+  height: 100%;
+  background: #eef1f5;
+  font-family: var(--m-font);
+}
+
+/* The soft, recessive basemap look, produced here rather than bought.
+ *
+ * OpenStreetMap's default style is high-contrast and colourful — good for
+ * reading streets, bad as a backdrop for four status colours. Desaturating and
+ * lifting it in CSS keeps the tiles keyless while making the data the only
+ * saturated thing on screen. See CalmMap.jsx for why this is not CARTO. */
+.m-canvas .m-tiles {
+  filter: saturate(0.2) brightness(1.1) contrast(0.88);
+}
+
+/* Leaflet's default attribution is loud; keep it legible but quiet. It stays
+   visible because OpenStreetMap requires attribution. */
+.m-canvas .leaflet-control-attribution {
+  background: rgba(255, 255, 255, 0.88);
+  font-size: 11px;
+  color: var(--m-ink-3);
+  padding: 2px 8px;
+  border-radius: var(--m-r-sm) 0 0 0;
+}
+.m-canvas .leaflet-control-attribution a { color: var(--m-ink-2); }
+
+.m-canvas .leaflet-control-zoom {
+  border: 1px solid var(--m-border) !important;
+  border-radius: var(--m-r-sm) !important;
+  box-shadow: var(--m-shadow) !important;
+  overflow: hidden;
+}
+.m-canvas .leaflet-control-zoom a {
+  width: 40px;
+  height: 40px;
+  line-height: 40px;
+  color: var(--m-ink-2);
+  background: var(--m-surface);
+  border-bottom-color: var(--m-border);
+  font-weight: 500;
+}
+.m-canvas .leaflet-control-zoom a:hover { background: var(--m-surface-2); color: var(--m-ink); }
+
+/* --------------------------------------------------------------- panels */
+.m-panel {
+  position: absolute;
+  background: var(--m-surface);
+  border: 1px solid var(--m-border);
+  border-radius: var(--m-r);
+  box-shadow: var(--m-shadow);
+  z-index: 500;
+}
+
+/* Top-left: identity, the one summary line, and the provenance chip. */
+.m-brandcard {
+  top: var(--m-s4);
+  left: var(--m-s4);
+  padding: var(--m-s3) var(--m-s4);
+  min-width: 300px;
+  max-width: 356px;
+}
+
+.m-brand {
+  display: flex;
+  align-items: center;
+  gap: var(--m-s2);
+  margin-bottom: var(--m-s2);
+}
+
+.m-brand-name {
+  font-size: var(--m-t-md);
+  font-weight: 650;
+  letter-spacing: -0.01em;
+  color: var(--m-ink);
+}
+
+.m-brand-mark { color: var(--m-attn); display: flex; }
+
+.m-summary {
+  font-size: var(--m-t-sm);
+  color: var(--m-ink-2);
+  line-height: 1.45;
+  margin-bottom: var(--m-s3);
+}
+.m-summary b {
+  color: var(--m-ink);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+.m-summary .m-dot { color: var(--m-ink-3); margin: 0 2px; }
+
+/* ----------------------------------------------------------------- chip */
+.m-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 10px;
+  border-radius: 999px;
+  font-size: var(--m-t-xs);
+  font-weight: 500;
+  border: 1px solid transparent;
+  line-height: 1.3;
+}
+
+.m-chip-led {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  flex: 0 0 auto;
+  background: currentColor;
+}
+
+/* One class per provenance state. Never ambiguous. */
+.m-chip-live { background: var(--m-normal-wash); color: #1f6344; border-color: #bfe0cd; }
+.m-chip-replay { background: var(--m-accent-wash); color: var(--m-accent-ink); border-color: #bcd3ee; }
+.m-chip-offline { background: var(--m-watch-wash); color: #8a5a12; border-color: #e8d4a8; }
+.m-chip-empty { background: var(--m-unsure-wash); color: #555b64; border-color: var(--m-border-strong); }
+.m-chip-down { background: var(--m-attn-wash); color: #96281f; border-color: #eec0ba; }
+
+.m-chip-live .m-chip-led { box-shadow: 0 0 0 3px rgba(47, 133, 90, 0.18); }
+
+.m-age {
+  font-size: 11px;
+  color: var(--m-ink-3);
+  margin-top: 6px;
+  line-height: 1.4;
+}
+
+/* --------------------------------------------------------------- search */
+.m-searchwrap {
+  position: absolute;
+  top: var(--m-s4);
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 600;
+  width: min(500px, calc(100vw - 440px));
+}
+
+.m-search {
+  display: flex;
+  align-items: center;
+  gap: var(--m-s2);
+  background: var(--m-surface);
+  border: 1px solid var(--m-border);
+  border-radius: var(--m-r);
+  box-shadow: var(--m-shadow);
+  padding: 0 var(--m-s3);
+  height: 44px;
+}
+.m-search:focus-within { border-color: var(--m-accent); box-shadow: var(--m-shadow), 0 0 0 3px var(--m-accent-wash); }
+.m-search svg { color: var(--m-ink-3); flex: 0 0 auto; }
+.m-search input {
+  flex: 1;
+  border: 0;
+  background: transparent;
+  outline: none;
+  color: var(--m-ink);
+  font-size: var(--m-t-sm);
+  min-width: 0;
+}
+.m-search input::placeholder { color: var(--m-ink-3); }
+
+.m-search-clear {
+  border: 0;
+  background: transparent;
+  color: var(--m-ink-3);
+  cursor: pointer;
+  padding: 8px;
+  margin-right: -8px;
+  display: flex;
+  border-radius: var(--m-r-sm);
+}
+.m-search-clear:hover { color: var(--m-ink); background: var(--m-surface-2); }
+
+.m-results {
+  margin-top: var(--m-s2);
+  background: var(--m-surface);
+  border: 1px solid var(--m-border);
+  border-radius: var(--m-r);
+  box-shadow: var(--m-shadow-lg);
+  overflow: hidden;
+  max-height: 320px;
+  overflow-y: auto;
+}
+
+.m-result {
+  display: flex;
+  align-items: center;
+  gap: var(--m-s3);
+  width: 100%;
+  border: 0;
+  background: transparent;
+  text-align: left;
+  padding: 10px var(--m-s3);
+  cursor: pointer;
+  border-bottom: 1px solid var(--m-border);
+  min-height: 44px;
+}
+.m-result:last-child { border-bottom: 0; }
+.m-result:hover,
+.m-result[aria-selected='true'] { background: var(--m-surface-2); }
+
+.m-result-name {
+  font-size: var(--m-t-sm);
+  color: var(--m-ink);
+  font-weight: 500;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.m-result-detail { font-size: var(--m-t-xs); color: var(--m-ink-3); }
+
+.m-empty-note {
+  padding: var(--m-s3);
+  font-size: var(--m-t-sm);
+  color: var(--m-ink-3);
+}
+
+/* ---------------------------------------------------------------- chips */
+.m-filters {
+  display: flex;
+  gap: var(--m-s2);
+  margin-top: var(--m-s2);
+  flex-wrap: nowrap;
+  justify-content: center;
+}
+
+.m-filter {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 36px;
+  padding: 0 var(--m-s3);
+  border-radius: 999px;
+  border: 1px solid var(--m-border);
+  background: var(--m-surface);
+  box-shadow: var(--m-shadow);
+  color: var(--m-ink-2);
+  font-size: var(--m-t-xs);
+  font-weight: 500;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background 150ms var(--m-ease), border-color 150ms var(--m-ease);
+}
+.m-filter:hover { background: var(--m-surface-2); }
+.m-filter[aria-pressed='true'] {
+  background: var(--m-ink);
+  border-color: var(--m-ink);
+  color: #fff;
+}
+.m-filter[aria-pressed='true'] .m-filter-swatch { box-shadow: 0 0 0 1.5px rgba(255, 255, 255, 0.55); }
+
+.m-filter-swatch {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex: 0 0 auto;
+}
+
+/* --------------------------------------------------------- markers */
+.m-marker {
+  border-radius: 50%;
+  border: 2px solid #fff;
+  box-shadow: 0 1px 3px rgba(16, 24, 40, 0.35);
+  box-sizing: border-box;
+}
+
+/* "Needs attention" is a ring, "Watch" a filled dot, "Not sure" a hollow dot,
+   "Normal" a small dot. Shape plus colour, never colour alone. */
+.m-marker-needs_attention { background: var(--m-attn); }
+.m-marker-watch { background: var(--m-watch); }
+.m-marker-normal { background: var(--m-normal); }
+.m-marker-not_sure { background: #fff; border-color: var(--m-unsure); border-width: 3px; }
+
+.m-marker-selected { box-shadow: 0 0 0 4px rgba(26, 95, 180, 0.35), 0 1px 3px rgba(16, 24, 40, 0.35); }
+
+/* Only the single highest-priority marker pulses, and only subtly. */
+@keyframes m-pulse {
+  0% { box-shadow: 0 0 0 0 rgba(192, 54, 44, 0.45); }
+  70% { box-shadow: 0 0 0 12px rgba(192, 54, 44, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(192, 54, 44, 0); }
+}
+.m-marker-pulse { animation: m-pulse 2.4s var(--m-ease) infinite; }
+
+.m-cluster {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  background: var(--m-surface);
+  border: 1px solid var(--m-border-strong);
+  box-shadow: var(--m-shadow);
+  font-size: var(--m-t-xs);
+  font-weight: 600;
+  color: var(--m-ink-2);
+  font-variant-numeric: tabular-nums;
+}
+.m-cluster-attn { border-color: var(--m-attn); color: var(--m-attn); }
+
+/* ------------------------------------------------------------ site card */
+.m-sitecard {
+  top: var(--m-s4);
+  right: var(--m-s4);
+  width: 352px;
+  max-height: calc(100vh - var(--m-s4) * 2);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  animation: m-slide-in 180ms var(--m-ease);
+}
+
+@keyframes m-slide-in {
+  from { opacity: 0; transform: translateX(8px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+
+.m-card-head {
+  padding: var(--m-s4);
+  padding-bottom: var(--m-s3);
+  display: flex;
+  align-items: flex-start;
+  gap: var(--m-s2);
+}
+
+.m-card-title {
+  font-size: var(--m-t-md);
+  font-weight: 650;
+  line-height: 1.3;
+  letter-spacing: -0.01em;
+  flex: 1;
+  min-width: 0;
+  overflow-wrap: break-word;
+}
+
+.m-card-sub {
+  font-size: var(--m-t-xs);
+  color: var(--m-ink-3);
+  margin-top: 2px;
+}
+
+.m-close {
+  border: 0;
+  background: transparent;
+  color: var(--m-ink-3);
+  cursor: pointer;
+  padding: var(--m-s2);
+  margin: calc(var(--m-s2) * -1);
+  border-radius: var(--m-r-sm);
+  display: flex;
+  flex: 0 0 auto;
+}
+.m-close:hover { background: var(--m-surface-2); color: var(--m-ink); }
+
+.m-card-body { padding: 0 var(--m-s4) var(--m-s4); overflow-y: auto; }
+
+.m-status-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  font-size: var(--m-t-xs);
+  font-weight: 600;
+  border: 1px solid transparent;
+  white-space: nowrap;
+}
+.m-status-needs_attention { background: var(--m-attn-wash); color: #96281f; border-color: #eec0ba; }
+.m-status-watch { background: var(--m-watch-wash); color: #8a5a12; border-color: #e8d4a8; }
+.m-status-normal { background: var(--m-normal-wash); color: #1f6344; border-color: #bfe0cd; }
+.m-status-not_sure { background: var(--m-unsure-wash); color: #555b64; border-color: var(--m-border-strong); }
+
+.m-verdict {
+  font-size: var(--m-t-sm);
+  line-height: 1.5;
+  color: var(--m-ink);
+  margin: var(--m-s3) 0;
+}
+
+.m-why {
+  list-style: none;
+  margin: 0 0 var(--m-s4);
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.m-why li {
+  display: flex;
+  gap: var(--m-s2);
+  font-size: var(--m-t-xs);
+  color: var(--m-ink-2);
+  line-height: 1.45;
+}
+.m-why svg { flex: 0 0 auto; margin-top: 2px; color: var(--m-ink-3); }
+
+.m-unsure-note {
+  background: var(--m-unsure-wash);
+  border: 1px solid var(--m-border);
+  border-radius: var(--m-r-sm);
+  padding: var(--m-s2) var(--m-s3);
+  font-size: var(--m-t-xs);
+  color: var(--m-ink-2);
+  line-height: 1.45;
+  margin-bottom: var(--m-s4);
+}
+.m-unsure-note b { font-weight: 600; color: var(--m-ink); }
+
+/* The one small chart: today against this location's recorded range. */
+.m-band { margin-bottom: var(--m-s4); }
+.m-band-label {
+  font-size: 11px;
+  color: var(--m-ink-3);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  font-weight: 600;
+  margin-bottom: 6px;
+}
+.m-band-note { font-size: 11px; color: var(--m-ink-3); margin-top: 6px; line-height: 1.45; }
+
+.m-actions {
+  display: flex;
+  gap: var(--m-s2);
+  padding: var(--m-s3) var(--m-s4);
+  border-top: 1px solid var(--m-border);
+  background: var(--m-surface-2);
+}
+
+.m-btn {
+  flex: 1;
+  color: var(--m-ink);
+  height: 40px;
+  border-radius: var(--m-r-sm);
+  border: 1px solid var(--m-border-strong);
+  background: var(--m-surface);
+  color: var(--m-ink);
+  font-size: var(--m-t-xs);
+  font-weight: 550;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  transition: background 150ms var(--m-ease);
+}
+.m-btn:hover { background: var(--m-surface-2); }
+.m-btn-primary { background: var(--m-ink); border-color: var(--m-ink); color: #fff; }
+.m-btn-primary:hover { background: #000; }
+.m-btn:disabled { opacity: 0.55; cursor: default; }
+
+/* ------------------------------------------------------- attention list */
+.m-attnlist {
+  bottom: var(--m-s4);
+  left: var(--m-s4);
+  width: 300px;
+  overflow: hidden;
+}
+
+.m-attnlist-head {
+  padding: 10px var(--m-s3);
+  font-size: 11px;
+  font-weight: 650;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--m-ink-3);
+  border-bottom: 1px solid var(--m-border);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.m-attnrow {
+  display: flex;
+  align-items: center;
+  gap: var(--m-s2);
+  width: 100%;
+  border: 0;
+  background: transparent;
+  text-align: left;
+  padding: 9px var(--m-s3);
+  cursor: pointer;
+  border-bottom: 1px solid var(--m-border);
+  min-height: 40px;
+}
+.m-attnrow:last-child { border-bottom: 0; }
+.m-attnrow:hover { background: var(--m-surface-2); }
+.m-attnrow-name {
+  flex: 1;
+  min-width: 0;
+  font-size: var(--m-t-xs);
+  color: var(--m-ink);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.m-attnrow-swatch { width: 8px; height: 8px; border-radius: 50%; flex: 0 0 auto; }
+
+/* ----------------------------------------------------------- drawer */
+.m-drawer-scrim {
+  position: fixed;
+  inset: 0;
+  background: rgba(16, 24, 40, 0.28);
+  z-index: 900;
+  animation: m-fade 150ms var(--m-ease);
+}
+@keyframes m-fade { from { opacity: 0; } to { opacity: 1; } }
+
+.m-drawer {
+  position: fixed;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: min(480px, 100vw);
+  background: var(--m-surface);
+  border-left: 1px solid var(--m-border);
+  box-shadow: var(--m-shadow-lg);
+  z-index: 1000;
+  display: flex;
+  flex-direction: column;
+  animation: m-drawer-in 200ms var(--m-ease);
+}
+@keyframes m-drawer-in { from { transform: translateX(16px); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
+
+.m-drawer-head {
+  padding: var(--m-s4);
+  border-bottom: 1px solid var(--m-border);
+  display: flex;
+  align-items: center;
+  gap: var(--m-s2);
+}
+.m-drawer-title { font-size: var(--m-t-md); font-weight: 650; flex: 1; letter-spacing: -0.01em; }
+.m-drawer-body { padding: var(--m-s4); overflow-y: auto; flex: 1; }
+
+.m-group { margin-bottom: var(--m-s5); }
+.m-group:last-child { margin-bottom: 0; }
+.m-group-title {
+  font-size: 11px;
+  font-weight: 650;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--m-ink-3);
+  margin-bottom: var(--m-s2);
+  padding-bottom: 6px;
+  border-bottom: 1px solid var(--m-border);
+}
+
+.m-ev {
+  display: flex;
+  gap: var(--m-s2);
+  padding: 7px 0;
+  font-size: var(--m-t-xs);
+  line-height: 1.45;
+  color: var(--m-ink-2);
+  align-items: flex-start;
+}
+.m-ev svg { flex: 0 0 auto; margin-top: 1px; }
+.m-ev-supporting svg { color: var(--m-normal); }
+.m-ev-missing svg { color: var(--m-watch); }
+.m-ev-contradicting svg { color: var(--m-attn); }
+
+/* "Details for experts" fold. Everything quantitative lives behind it. */
+.m-fold { border: 1px solid var(--m-border); border-radius: var(--m-r-sm); overflow: hidden; margin-top: var(--m-s4); }
+.m-fold > summary {
+  padding: 10px var(--m-s3);
+  cursor: pointer;
+  font-size: var(--m-t-xs);
+  font-weight: 600;
+  color: var(--m-ink-2);
+  background: var(--m-surface-2);
+  list-style: none;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 40px;
+}
+.m-fold > summary::-webkit-details-marker { display: none; }
+.m-fold > summary::after { content: '+'; margin-left: auto; color: var(--m-ink-3); font-size: var(--m-t-md); }
+.m-fold[open] > summary::after { content: '\2212'; }
+.m-fold-body { padding: var(--m-s3); border-top: 1px solid var(--m-border); }
+
+.m-kv { display: grid; grid-template-columns: auto 1fr; gap: 6px var(--m-s3); font-size: var(--m-t-xs); }
+.m-kv dt { color: var(--m-ink-3); }
+.m-kv dd {
+  margin: 0;
+  color: var(--m-ink);
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  overflow-wrap: anywhere;
+}
+
+/* ----------------------------------------------------------- banner */
+.m-banner {
+  position: absolute;
+  bottom: var(--m-s4);
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 700;
+  display: flex;
+  align-items: center;
+  gap: var(--m-s3);
+  background: var(--m-surface);
+  border: 1px solid var(--m-watch);
+  border-left-width: 3px;
+  border-radius: var(--m-r-sm);
+  box-shadow: var(--m-shadow-lg);
+  padding: 10px var(--m-s3);
+  font-size: var(--m-t-xs);
+  color: var(--m-ink);
+  max-width: min(560px, calc(100vw - 32px));
+}
+.m-banner-retry {
+  border: 1px solid var(--m-border-strong);
+  background: var(--m-surface);
+  border-radius: 6px;
+  padding: 5px 10px;
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+  min-height: 32px;
+}
+.m-banner-retry:hover { background: var(--m-surface-2); }
+
+/* ------------------------------------------------------------ footer */
+/* Sits beside the zoom stack, not on top of it. Leaflet's bottom-right zoom
+   control is 40px wide with its own 10px margin, hence the 64px offset. */
+.m-footlink {
+  position: absolute;
+  bottom: var(--m-s5);
+  right: 64px;
+  z-index: 500;
+  display: flex;
+  gap: var(--m-s2);
+  align-items: center;
+}
+
+.m-ghost {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 36px;
+  padding: 0 var(--m-s3);
+  border-radius: var(--m-r-sm);
+  border: 1px solid var(--m-border);
+  background: rgba(255, 255, 255, 0.94);
+  box-shadow: var(--m-shadow);
+  color: var(--m-ink-2);
+  font-size: var(--m-t-xs);
+  font-weight: 500;
+  cursor: pointer;
+  text-decoration: none;
+  white-space: nowrap;
+}
+.m-ghost:hover { background: #fff; color: var(--m-ink); }
+
+/* ---------------------------------------------------------- skeletons */
+/* A skeleton, never a spinner over a blank map: the shape of what is coming
+   is more reassuring than a loading indicator with no context. */
+.m-skel {
+  background: linear-gradient(90deg, var(--m-surface-sunk) 25%, #e8ebef 37%, var(--m-surface-sunk) 63%);
+  background-size: 400% 100%;
+  animation: m-shimmer 1.4s ease-in-out infinite;
+  border-radius: 6px;
+}
+@keyframes m-shimmer { from { background-position: 100% 0; } to { background-position: 0 0; } }
+.m-skel-line { height: 10px; margin-bottom: 8px; }
+
+/* -------------------------------------------------------------- a11y */
+.m-sr {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* --------------------------------------------------------- responsive */
+@media (max-width: 1100px) {
+  .m-searchwrap { width: min(400px, calc(100vw - 360px)); }
+  .m-sitecard { width: 320px; }
+}
+
+/* Phone: the detail card becomes a bottom sheet, the attention list hides
+   behind the summary count, and the search bar spans the width. */
+@media (max-width: 760px) {
+  .m-brandcard { left: var(--m-s2); right: var(--m-s2); top: var(--m-s2); max-width: none; min-width: 0; }
+  /* Bottom stack on a phone: chips above the search box, both clear of
+     Leaflet's attribution strip. Chips below the input were clipped by it. */
+  .m-searchwrap {
+    top: auto;
+    bottom: 28px;
+    left: var(--m-s2);
+    right: var(--m-s2);
+    width: auto;
+    transform: none;
+    display: flex;
+    flex-direction: column-reverse;
+  }
+  .m-filters {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    justify-content: flex-start;
+    margin: 0 0 var(--m-s2);
+    padding-bottom: 2px;
+    scrollbar-width: none;
+  }
+  .m-filters::-webkit-scrollbar { display: none; }
+  .m-results { max-height: 46vh; margin: 0 0 var(--m-s2); }
+
+  .m-attnlist { display: none; }
+  .m-footlink { bottom: 148px; right: var(--m-s2); }
+  .m-banner { bottom: 148px; }
+
+  .m-sitecard {
+    top: auto;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    width: auto;
+    max-height: 72vh;
+    border-radius: var(--m-r-lg) var(--m-r-lg) 0 0;
+    animation: m-sheet-in 200ms var(--m-ease);
+  }
+  @keyframes m-sheet-in { from { transform: translateY(16px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .mapapp *,
+  .mapapp *::before,
+  .mapapp *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+  }
+}
