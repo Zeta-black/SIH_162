@@ -198,6 +198,61 @@ if (wanted('secrets')) {
     }
   }
   check('No key-shaped secret in any tracked file', suspects.length === 0, suspects.join('; '))
+
+  /* The same scan over git history.
+   *
+   * Added in Pass 2 because the tracked-files scan passed while a real key sat
+   * in an earlier commit's diff. A scan of the working tree cannot see that, and
+   * "no secrets in the repo" has to mean the history too.
+   *
+   * backup-before-scrub deliberately retains the pre-scrub history so a human
+   * can verify the rewrite before deleting it, so a hit confined to that branch
+   * is reported rather than failed. */
+  const gitOut = (args) =>
+    new Promise((resolve) => {
+      const child = spawn('git', args, { cwd: ROOT, encoding: 'utf8' })
+      let out = ''
+      child.stdout.on('data', (d) => (out += d))
+      child.on('close', () => resolve(out))
+      child.on('error', () => resolve(''))
+    })
+
+  const keyLine = /FIRMS_MAP_KEY=\s*([a-f0-9]{32})\b/g
+  const shas = (await gitOut(['log', '--all', '--format=%H', '-S', 'FIRMS_MAP_KEY='])).split('\n').filter(Boolean)
+
+  const dirty = new Set()
+  for (const sha of shas) {
+    const diff = await gitOut(['show', sha, '--', '.env.example', 'docs/', 'README.md'])
+    for (const m of diff.matchAll(keyLine)) {
+      if (!isObviouslyFake(m[1])) dirty.add(sha.slice(0, 10))
+    }
+  }
+
+  let onlyOnBackup = false
+  if (dirty.size > 0) {
+    const containing = await gitOut(['branch', '--contains', [...dirty][0]])
+    onlyOnBackup = containing
+      .split('\n')
+      .filter((l) => l.trim())
+      .every((l) => l.includes('backup-before-scrub'))
+  }
+
+  check(
+    'No key-shaped secret anywhere in git history',
+    dirty.size === 0 || onlyOnBackup,
+    dirty.size === 0
+      ? 'history clean'
+      : onlyOnBackup
+        ? `${dirty.size} commit(s) on backup-before-scrub only — delete that branch`
+        : [...dirty].join(', '),
+  )
+
+  const ignored = await new Promise((resolve) => {
+    const child = spawn('git', ['check-ignore', '.env'], { cwd: ROOT })
+    child.on('close', (code) => resolve(code === 0))
+    child.on('error', () => resolve(false))
+  })
+  check('.env is covered by .gitignore', ignored)
 }
 
 // =====================================================================  2
