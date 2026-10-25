@@ -34,6 +34,7 @@ from app.schemas import (
 from app.services import firms as firms_service
 from app.services import landcover as landcover_service
 from app.services import osm as osm_service
+from app.services import livecache
 from app.services import snapshot as snapshot_service
 from app.services.classifier import DISCLAIMER, INDUSTRIAL_RELATED, get_classifier
 from app.services.geo import GridPoint, SpatialGrid, parse_bbox
@@ -130,6 +131,14 @@ def _acquire_events(
                     len(result.events),
                     "; ".join(result.errors)[:400],
                 )
+                # Keep the last good live response on disk so a restart on a
+                # dead network still has real live-sourced data to fall back to.
+                livecache.save(
+                    result.events,
+                    ",".join(f"{c:.4f}" for c in bbox),
+                    days,
+                    result.products_used,
+                )
                 message = f"Live NASA FIRMS feed, {len(result.events)} detections in the last {days} day(s)."
                 if result.errors:
                     message += f" {len(result.errors)} product(s) unavailable."
@@ -146,15 +155,36 @@ def _acquire_events(
                 result.products_used,
             )
         except firms_service.FirmsError as exc:
-            if mode == "live":
-                return [], "live", exc.kind, str(exc), []  # type: ignore[return-value]
             firms_failure_kind = exc.kind
             firms_failure_message = str(exc)
-            log.warning("[FALLBACK] FIRMS unavailable (%s); demo mode activated", exc)
+            log.warning("[FALLBACK] FIRMS unavailable (%s)", exc)
         except Exception as exc:  # noqa: BLE001
-            if mode == "live":
-                return [], "live", "unavailable", f"FIRMS request failed ({type(exc).__name__}).", []
-            log.warning("[FALLBACK] FIRMS error %s; demo mode activated", type(exc).__name__)
+            firms_failure_kind = "unavailable"
+            firms_failure_message = f"FIRMS request failed ({type(exc).__name__})."
+            log.warning("[FALLBACK] FIRMS error %s", type(exc).__name__)
+
+        # Explicit Live mode used to return an empty list still labelled "Live
+        # NASA FIRMS", which put an empty map on screen under a green badge
+        # while the key was rejected. Every failure now degrades through the
+        # same chain, and the resolved mode says which rung it landed on.
+        cached = livecache.load()
+        if cached is not None:
+            log.info(
+                "[FALLBACK] serving %d detections from the on-disk live cache (%d min old)",
+                len(cached.events),
+                cached.age_minutes,
+            )
+            return (
+                cached.events,
+                "cached",
+                "cached",
+                (
+                    f"{firms_failure_message or 'Live FIRMS data is unavailable.'} "
+                    f"Showing the last successful NASA FIRMS fetch, "
+                    f"{cached.age_minutes} minutes old."
+                ),
+                cached.products,
+            )
 
     snap = snapshot_service.load_snapshot()
     if snap is None or not snap.events:
@@ -356,8 +386,20 @@ def run_analysis(
         )
 
     status = DataSourceStatus(
-        mode="live" if resolved_mode == "live" else "snapshot",
-        label="Live NASA FIRMS" if resolved_mode == "live" else "Demo / Historical Data",
+        mode=(
+            "live"
+            if resolved_mode == "live"
+            else "cached"
+            if resolved_mode == "cached"
+            else "snapshot"
+        ),
+        label=(
+            "Live NASA FIRMS"
+            if resolved_mode == "live"
+            else "Saved NASA FIRMS data"
+            if resolved_mode == "cached"
+            else "Demo / Historical Data"
+        ),
         firms_status=firms_status,  # type: ignore[arg-type]
         firms_message=firms_message,
         firms_products_used=products,

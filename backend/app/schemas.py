@@ -200,9 +200,13 @@ class ClassifiedEvent(BaseModel):
 # API envelopes
 # ---------------------------------------------------------------------------
 class DataSourceStatus(BaseModel):
-    mode: Literal["live", "snapshot"]
+    # "cached" is a third, distinct state: real NASA data from the most recent
+    # successful fetch, read back from disk after a later fetch failed. It is
+    # neither live nor the frozen archive, and collapsing it into either would
+    # misrepresent what is on screen.
+    mode: Literal["live", "cached", "snapshot"]
     label: str
-    firms_status: Literal["ok", "unavailable", "not_configured", "no_data"]
+    firms_status: Literal["ok", "unavailable", "not_configured", "no_data", "cached"]
     firms_message: str
     firms_products_used: list[str]
     osm_status: Literal["ok", "cached", "unavailable", "snapshot"]

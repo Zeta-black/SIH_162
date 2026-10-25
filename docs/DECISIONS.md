@@ -52,3 +52,34 @@ Newest at the bottom.
   (6.5N-36N) is correctly zoom 4 at 1366x768, which puts Arabia and Indonesia
   on screen; it also stops the map implying coverage we do not have · reverse in
   `CalmMap` `fitRef`.
+
+## Phase 2 — demo reliability
+
+- **FIRMS timeout cut from 45 s to 8 s** · the client tries each configured
+  product in turn, so 45 s meant a worst case over two minutes before any
+  fallback; NASA answers a national query in 2-4 s when it answers at all ·
+  reverse via `FIRMS_TIMEOUT_SECONDS` in `.env`.
+- **Retries only for timeouts and 5xx** · a rejected key, a 429 and a connection
+  error do not improve by asking again, and retrying each across three products
+  turned a dead network into a ~20 s wait · reverse in `firms._get`.
+- **The product loop stops on a network-level failure** · a timeout tells you
+  about the network, not the product; trying the next one buys the same answer
+  for another full timeout · reverse in `firms.fetch_area`.
+- **New on-disk cache of the last good live fetch** (`livecache.py`) · the
+  in-memory analysis cache dies with the process, so a restart on a dead network
+  had nothing live to show; this survives restarts, expires after 72 h, and is
+  always labelled with its real age · reverse by deleting the module and its
+  pipeline call.
+- **Explicit Live mode now degrades instead of returning an empty map** · it
+  used to answer HTTP 200 with zero events under a "Live NASA FIRMS" label when
+  the key was rejected (BASELINE D2) · reverse in `pipeline._acquire_events`.
+- **Added a third source state, `cached`, to `DataSourceStatus`** · real NASA
+  data read back from disk is neither live nor the frozen archive, and
+  collapsing it into either misrepresents the screen · reverse by narrowing the
+  Literal back to live|snapshot.
+- **Isolated the live disk cache in the `test_store_api` fixture** · adding the
+  cache made "survives a total NASA outage" depend on whether a real cache file
+  existed on the developer's machine · reverse: remove the monkeypatch.
+- **`npm run demo` as the single entry point**, with `demo.sh`, `demo.ps1` and
+  `demo.bat` as thin wrappers so the logic cannot drift · reverse by deleting
+  `scripts/demo.mjs`.

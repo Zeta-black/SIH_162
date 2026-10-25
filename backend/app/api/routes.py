@@ -447,16 +447,14 @@ def _provenance(requested_mode: str, status, n_events: int) -> dict:
         elif firms == "no_data":
             state, label = "live_empty", "Live · no detections in window"
         else:
-            # Live was requested explicitly and failed, and explicit live mode
-            # does not fall back. Say so plainly rather than showing an empty
-            # map under a "Live" badge.
             state, label = "unavailable", "Live feed unavailable"
+    elif resolved == "cached":
+        # Real NASA data, but not fetched now. Never shown as live.
+        state, label = "offline", "Offline · showing saved data"
     else:
         if requested_mode == "demo":
             state, label = "replay", "Replay · real historical detections"
-        elif firms in ("unavailable", "not_configured", "rate_limited"):
-            state, label = "offline", "Offline · showing saved data"
-        elif firms == "unavailable" or not status.firms_products_used:
+        elif firms in ("unavailable", "not_configured", "cached") or not status.firms_products_used:
             state, label = "offline", "Offline · showing saved data"
         else:
             state, label = "replay", "Replay · real historical detections"

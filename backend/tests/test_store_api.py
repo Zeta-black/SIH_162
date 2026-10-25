@@ -161,8 +161,17 @@ def client(monkeypatch, tmp_path):
     """A TestClient whose data sources are all stubbed out.
 
     FIRMS is forced to fail so every test also proves the fallback path works.
+
+    The on-disk live cache is redirected into tmp_path. Without that, these
+    tests read whatever the developer's last real fetch left behind, and
+    "survives a total NASA outage" started passing or failing depending on
+    whether a cache file happened to exist on the machine.
     """
     from app.main import app
+    from app.services import livecache
+
+    monkeypatch.setattr(livecache, "CACHE_FILE", tmp_path / "last_live_fetch.json")
+    monkeypatch.setattr(livecache, "CACHE_DIR", tmp_path)
 
     pipeline.clear_cache()
 
@@ -244,7 +253,13 @@ class TestModelInfo:
 
 class TestHotspotsEndpoint:
     def test_survives_total_nasa_outage(self, client):
-        """The core resilience requirement."""
+        """The core resilience requirement.
+
+        With no usable on-disk cache (the fixture isolates it), a total outage
+        lands on the frozen archive. When a recent cache *is* present the
+        pipeline prefers it and reports mode "cached" instead — covered in
+        tests/test_demo_reliability.py.
+        """
         response = client.get("/api/hotspots?days=3&mode=auto")
         assert response.status_code == 200
         body = response.json()

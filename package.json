@@ -2,17 +2,20 @@
   "name": "firetrace",
   "private": true,
   "version": "1.0.0",
-  "description": "FIRETRACE — AI-assisted detection and classification of industrial fires and persistent thermal sources (SIH 2026, PS 26162)",
+  "description": "FIRETRACE \u2014 AI-assisted detection and classification of industrial fires and persistent thermal sources (SIH 2026, PS 26162)",
   "type": "module",
   "scripts": {
     "setup": "node scripts/setup.mjs",
+    "demo": "node --no-deprecation scripts/demo.mjs",
+    "demo:offline": "node --no-deprecation scripts/demo.mjs --offline",
+    "prewarm": "node scripts/prewarm.mjs",
     "dev": "node scripts/dev.mjs",
     "test": "node scripts/run.mjs test",
+    "smoke": "node scripts/run.mjs smoke",
+    "build": "node scripts/run.mjs build",
     "train": "node scripts/run.mjs train",
     "build-data": "node scripts/run.mjs build-data",
     "build-snapshot": "node scripts/run.mjs build-snapshot",
-    "build": "node scripts/run.mjs build",
-    "smoke": "node scripts/run.mjs smoke",
     "benchmark": "node scripts/run.mjs benchmark"
   },
   "engines": {

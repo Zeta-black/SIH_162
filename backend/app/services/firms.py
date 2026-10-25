@@ -22,6 +22,7 @@ import csv
 import hashlib
 import io
 import logging
+import time
 from dataclasses import dataclass, field
 from datetime import date, datetime, timedelta, timezone
 
@@ -264,10 +265,61 @@ class FirmsClient:
         self._client = client
 
     def _get(self, url: str) -> httpx.Response:
+        """GET with bounded retries on transient failures.
+
+        Retried: read/connect timeouts, connection resets, and 5xx. Those are
+        the failures a venue network produces, and a second attempt 0.6 s later
+        usually succeeds.
+
+        NOT retried: HTTP 429, a rejected MAP_KEY, and connection errors. None
+        improves by asking again — retrying a rate limit actively makes it worse,
+        and a connection error means there is no network, which will not change
+        in 600 ms. Measured: retrying connection errors across three configured
+        products turned a no-network request into a 21 s wait before the offline
+        fallback engaged. These fall straight through so the fallback is immediate.
+        """
         if self._client is not None:
             return self._client.get(url)
-        with httpx.Client(timeout=settings.firms_timeout_seconds, follow_redirects=True) as c:
-            return c.get(url)
+
+        attempts = max(1, settings.firms_retries + 1)
+        last_exc: Exception | None = None
+
+        for attempt in range(attempts):
+            try:
+                with httpx.Client(
+                    timeout=settings.firms_timeout_seconds, follow_redirects=True
+                ) as c:
+                    resp = c.get(url)
+                if resp.status_code >= 500 and attempt < attempts - 1:
+                    log.warning(
+                        "[FIRMS] HTTP %s, retrying (%d/%d)",
+                        resp.status_code,
+                        attempt + 1,
+                        attempts - 1,
+                    )
+                else:
+                    return resp
+            except httpx.ConnectError:
+                # No route to NASA at all. Fail fast so the offline fallback
+                # engages now rather than after a round of pointless backoff.
+                raise
+            except (httpx.TimeoutException, httpx.TransportError) as exc:
+                last_exc = exc
+                if attempt >= attempts - 1:
+                    raise
+                log.warning(
+                    "[FIRMS] %s, retrying (%d/%d)",
+                    type(exc).__name__,
+                    attempt + 1,
+                    attempts - 1,
+                )
+
+            time.sleep(settings.firms_retry_backoff_seconds * (2**attempt))
+
+        if last_exc is not None:
+            raise last_exc
+        # Only reachable when the final attempt was a 5xx.
+        return resp
 
     def map_key_status(self) -> dict[str, object]:
         """Report quota usage. Never returns the key itself."""
@@ -315,6 +367,7 @@ class FirmsClient:
         products = products or settings.firms_source_list
         seen: set[str] = set()
         key_rejected = False
+        network_down = False
 
         # NOAA-21 is the primary NRT product.  Query a secondary product only
         # when the primary could not be obtained; downloading all products on
@@ -356,8 +409,17 @@ class FirmsClient:
                 result.errors.append(f"{product}: {exc}")
                 continue
             except httpx.TimeoutException:
+                # A timeout is about the network, not about this product. Trying
+                # the next one costs another full timeout to learn the same
+                # thing, so stop and let the caller fall back now. Measured: the
+                # product loop turned a dead network into a ~20 s wait.
                 result.errors.append(f"{product}: request to FIRMS timed out")
-                continue
+                network_down = True
+                break
+            except httpx.ConnectError:
+                result.errors.append(f"{product}: could not reach FIRMS (no route)")
+                network_down = True
+                break
             except Exception as exc:  # noqa: BLE001
                 result.errors.append(_redact(f"{product}: {type(exc).__name__}"))
                 continue
@@ -382,6 +444,11 @@ class FirmsClient:
             break
 
         if not result.products_used:
+            if network_down:
+                raise FirmsError(
+                    "Could not reach NASA FIRMS. " + "; ".join(result.errors[:2]),
+                    kind="unavailable",
+                )
             if key_rejected:
                 raise FirmsError(
                     "NASA FIRMS rejected the configured MAP_KEY. Replace FIRMS_MAP_KEY on the server.",

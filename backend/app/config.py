@@ -44,7 +44,19 @@ class Settings(BaseSettings):
     # The first product is the interactive primary. Remaining products are
     # fallbacks, rather than three mandatory downloads for every map load.
     firms_sources: str = "VIIRS_NOAA21_NRT,VIIRS_NOAA20_NRT,MODIS_NRT"
-    firms_timeout_seconds: float = 45.0
+    # 8 s, not 45. A demo cannot wait three quarters of a minute per product,
+    # and the loop tries each configured product in turn — so a 45 s timeout
+    # meant a worst case of over two minutes before any fallback engaged.
+    # NASA answers a national query in ~2-4 s when it answers at all.
+    firms_timeout_seconds: float = 8.0
+    # Transient failures (read timeout, connection reset, 5xx) are retried with
+    # exponential backoff. A rejected key or a 429 is NOT retried: neither gets
+    # better by asking again, and hammering a rate limit makes it worse.
+    firms_retries: int = 2
+    firms_retry_backoff_seconds: float = 0.6
+    # How long a cached live response stays usable as an offline fallback. It is
+    # always presented with its real age, never as if it were fresh.
+    live_disk_cache_max_age_hours: int = 72
     # Hard limit imposed by the FIRMS area API itself: it rejects anything
     # outside [1..5] with HTTP 400 'Invalid day range'. Verified against the
     # live endpoint, not assumed.
