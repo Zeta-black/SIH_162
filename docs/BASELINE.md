@@ -219,7 +219,7 @@ uncalibrated vote share. Render as a score, not a percent.
 **A live NASA FIRMS key was sitting in `.env.example` in the working tree.**
 
 ```
-.env.example:7:FIRMS_MAP_KEY=<redacted>
+.env.example:7:FIRMS_MAP_KEY=<a real 32-hex MAP_KEY, redacted>
 ```
 
 Verified **not** in git history — `git log --all -p -- .env.example` shows only

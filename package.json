@@ -11,17 +11,19 @@
     "prewarm": "node scripts/prewarm.mjs",
     "dev": "node scripts/dev.mjs",
     "test": "node scripts/run.mjs test",
-    "smoke": "node scripts/run.mjs smoke",
+    "smoke": "node --no-deprecation scripts/smoke.mjs",
     "build": "node scripts/run.mjs build",
     "train": "node scripts/run.mjs train",
     "build-data": "node scripts/run.mjs build-data",
     "build-snapshot": "node scripts/run.mjs build-snapshot",
-    "benchmark": "node scripts/run.mjs benchmark"
+    "benchmark": "node scripts/run.mjs benchmark",
+    "smoke:pipeline": "node scripts/run.mjs smoke"
   },
   "engines": {
     "node": ">=18"
   },
   "devDependencies": {
+    "axe-core": "^4.12.1",
     "playwright": "^1.64.1"
   }
 }
