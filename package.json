@@ -2,7 +2,7 @@
   "name": "firetrace",
   "private": true,
   "version": "1.0.0",
-  "description": "FIRETRACE \u2014 AI-assisted detection and classification of industrial fires and persistent thermal sources (SIH 2026, PS 26162)",
+  "description": "FIRETRACE — AI-assisted detection and classification of industrial fires and persistent thermal sources (SIH 2026, PS 26162)",
   "type": "module",
   "scripts": {
     "setup": "node scripts/setup.mjs",
@@ -17,5 +17,8 @@
   },
   "engines": {
     "node": ">=18"
+  },
+  "devDependencies": {
+    "playwright": "^1.64.1"
   }
 }
