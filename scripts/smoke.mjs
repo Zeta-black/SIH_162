@@ -162,7 +162,25 @@ if (wanted('secrets')) {
   const placeholder = /FIRMS_MAP_KEY=(your_|<|$|\s)/m.test(example)
   check('.env.example holds a placeholder, not a key', placeholder)
 
-  // A FIRMS MAP_KEY is 32 hex characters. Scan every tracked text file.
+  /* A FIRMS MAP_KEY is 32 hex characters. Scan every tracked text file.
+   *
+   * Two kinds of 32-hex string are legitimate and must not be flagged, or the
+   * check becomes noise that people learn to ignore:
+   *   - content hashes in the demo snapshot and the docs, which is why a hit
+   *     only counts when it sits next to a key-shaped word;
+   *   - deliberately fake keys in the degradation tests. Those are recognised
+   *     structurally — a key made of one short repeated block, or one made of a
+   *     single repeated character — rather than by listing literals, so a new
+   *     fake in a new test does not need the allowlist updated.
+   */
+  const isObviouslyFake = (value) => {
+    for (const size of [1, 2, 4, 8, 16]) {
+      const block = value.slice(0, size)
+      if (block.repeat(32 / size) === value) return true
+    }
+    return false
+  }
+
   const suspects = []
   for (const file of tracked) {
     if (/\.(png|jpg|jpeg|gif|ico|joblib|sqlite3|woff2?)$/i.test(file)) continue
@@ -174,8 +192,7 @@ if (wanted('secrets')) {
       continue
     }
     for (const m of content.matchAll(/\b[a-f0-9]{32}\b/g)) {
-      // The demo snapshot and docs legitimately contain hashes; only flag a
-      // 32-hex string that sits next to something key-shaped.
+      if (isObviouslyFake(m[0])) continue
       const around = content.slice(Math.max(0, m.index - 60), m.index + 40).toLowerCase()
       if (/key|token|secret|password/.test(around)) suspects.push(`${file}: ${m[0].slice(0, 8)}...`)
     }
@@ -405,10 +422,9 @@ if (wanted('degradation')) {
 // =====================================================================  6
 if (wanted('pipeline')) {
   group('6  Pipeline smoke test')
-  const code = await run(venvPython(), ['scripts/smoke_test.py'], {
+  const code = await run(venvPython(), ['scripts/smoke_test.py', '--base', API], {
     cwd: BACKEND,
     stdio: 'inherit',
-    env: { ...process.env, FIRETRACE_API: API, SMOKE_BASE_URL: API },
   })
   check('Replay and incident smoke test passes', code === 0, `exit ${code}`)
 }
@@ -422,7 +438,9 @@ if (wanted('browser')) {
     npmCmd,
     ['run', 'dev', '--', '--port', String(WEB_PORT), '--strictPort'],
     FRONTEND,
-    { VITE_API_BASE: API },
+    // Proxy target, not VITE_API_BASE: keeping the browser same-origin means
+    // no CORS allowlist to maintain and no API host baked into the bundle.
+    { FIRETRACE_API_TARGET: API },
   )
 
   if (await waitFor(`${WEB}/`, 60000, 'The dashboard')) {

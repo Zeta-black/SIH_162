@@ -83,3 +83,25 @@ Newest at the bottom.
 - **`npm run demo` as the single entry point**, with `demo.sh`, `demo.ps1` and
   `demo.bat` as thin wrappers so the logic cannot drift · reverse by deleting
   `scripts/demo.mjs`.
+
+## Phase 4 — quality gate
+
+- **`npm run smoke` starts its own backend and dashboard on dedicated ports** ·
+  the previous smoke test required a server already running and silently failed
+  against the wrong one · reverse: `npm run smoke:pipeline` still runs the
+  original Python test alone.
+- **Vite's dev proxy target is configurable (`FIRETRACE_API_TARGET`)** · lets the
+  gate run the whole stack isolated and same-origin, so no CORS allowlist and no
+  API host baked into the bundle · reverse: hardcode 8000 again.
+- **The basemap tile *count* warns rather than fails; the tile *host* is a hard
+  assertion** · openstreetmap.org throttles after the earlier groups' traffic, so
+  gating on it would make a green run mean "OSM felt generous today". The host
+  check is what catches the CARTO key-required trap · reverse in
+  `scripts/checks/browser.mjs`.
+- **Accessibility is axe-core, performance is measured paint timings — not
+  Lighthouse** · a real axe pass plus real FCP/DCL numbers is more honest than a
+  half-configured Lighthouse score, and adds no heavy dependency. Reported as
+  what they are, never as "Lighthouse 9x" · reverse by adding Lighthouse.
+- **Fake keys in tests are recognised structurally, not allowlisted** · a 32-hex
+  string made of one repeated block is a placeholder; this way a new fake in a
+  new test needs no scanner update · reverse in `scripts/smoke.mjs`.

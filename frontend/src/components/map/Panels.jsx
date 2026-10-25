@@ -188,13 +188,19 @@ export function SearchBar({ value, onChange, results, onPick, busy, loading }) {
     <div style={{ position: 'relative' }} ref={wrapRef}>
       <div className="m-search">
         <IconSearch />
+        {/* role="combobox" is required for aria-expanded/aria-controls to be
+            legal here: axe-core flags them as unsupported on a bare searchbox
+            (rule aria-allowed-attr, critical). With the role set, the input and
+            its results list form a proper combobox pattern. */}
         <input
           type="search"
+          role="combobox"
           value={value}
           placeholder="Search a facility or company"
           aria-label="Search a mapped industrial facility or company"
           aria-expanded={show}
           aria-controls={listId}
+          aria-autocomplete="list"
           autoComplete="off"
           onChange={(e) => {
             onChange(e.target.value)
