@@ -75,11 +75,12 @@ to Past data.
 
 > "This list is generated from what we actually hold — no hard-coded weeks."
 
-The blue rule and banner appear.
+A thin blue rule appears across the top of the screen, and the line in the card
+changes.
 
-> "Past data. Unmistakable, and it says *no alerts are sent*. A replay can never
-> look live and can never fire a real alert — that is enforced in one place in
-> the backend and tested directly."
+> "Past data. Unmistakable from across the room, and the card says *no alerts are
+> sent*. A replay can never look live and can never fire a real alert — that is
+> enforced in one place in the backend and tested directly."
 
 Point at the top-left summary:
 

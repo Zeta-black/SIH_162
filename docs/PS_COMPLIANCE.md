@@ -146,8 +146,10 @@ Stated here rather than left for a judge to discover.
 | **ESA WorldCover land-cover lookup** | Not integrated. Land cover stays OSM-derived and reports "not mapped" where absent. |
 | **Sentinel-2 per-event optical check** | Not integrated. The satellite basemap switch ships instead, and the drawer says "Optical check: not available". |
 | **Analyst labelling control** | The *schema* separates predicted class from any human label, but the popover and CSV export are not built. Mark reviewed records review, not a label. |
-| **Dense history backfill** | Still not written. Unchanged from Pass 2 and still the highest-value next action. |
-| **ESA WorldCover land cover** | Still not integrated. Land cover stays OSM-derived at ~53% coverage and reports "unavailable" where absent. |
+| **Dense history backfill** (`scripts/backfill_history`) | **Not written.** Unchanged across two passes and still the highest-value next action: it is what takes R2's abnormality from 4% of sites to most of them. It is a long-running data-collection job needing FIRMS archive access for long windows, not a demo feature. |
+| **ESA WorldCover land cover** | **Not integrated.** Land cover stays OSM-derived at ~53% coverage and reports "unavailable" where absent, which is honest but incomplete. |
+| **Analyst label picker + CSV export** | **Not built.** "Mark reviewed" records that someone looked, not what they concluded. The schema already keeps a human label separate from the predicted class, so this is UI work, and it is the only route in this project to the real ground truth R1 needs. |
+| **FIRMS `type` static-source field** | **Not captured.** Our normalisation drops it, so the one consistency check that does not depend on our own rules cannot be run. A small change to `services/firms.py` plus an archive rebuild. |
 | **Dark theme** | Built as a complete token set in `tokens.css` and it follows the system setting, but there is no manual toggle and it has had no design-QA pass. Light is the default and is what the demo should use. |
 
 ---
