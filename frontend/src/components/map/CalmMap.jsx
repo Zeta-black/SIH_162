@@ -58,6 +58,22 @@ const INDIA_BOUNDS = [
   [6.5, 68.0],
   [36.0, 97.5],
 ]
+
+/* How far a reader may pan.
+ *
+ * Tight enough that Xinjiang and Thailand are barely reachable, loose enough
+ * that dragging near the coast still feels free.
+ *
+ * Note the limit of this: India is ~29.5 degrees tall and ~29.5 wide, and a
+ * 16:9 viewport fitted to that height shows ~52 degrees of longitude. So the
+ * default view will always include some neighbouring territory, and its OSM
+ * labels are in scripts we cannot restyle without a different tile provider.
+ * maxBounds stops someone panning *into* those areas; it cannot crop them out
+ * of a fitted view. Recorded rather than papered over. */
+const PAN_BOUNDS = [
+  [4.0, 64.5],
+  [38.5, 101.0],
+]
 const CLUSTER_MAX_ZOOM = 8
 
 const prefersReducedMotion = () =>
@@ -95,9 +111,12 @@ function siteIcon(site, { selected, pulse, isNew }) {
 
 function clusterIcon(count, worst) {
   const size = count > 99 ? 40 : count > 20 ? 36 : 32
+  /* Light fill, dark count, and a ring in the colour of the worst status inside.
+   * A cluster containing one "needs attention" site wears a red ring, so red
+   * stays the most visible thing on the map even when it is bundled up. */
   return L.divIcon({
     className: '',
-    html: `<div class="fc-cluster ${worst === 'needs_attention' ? 'fc-cluster-attn' : ''}" style="width:${size}px;height:${size}px">${count}</div>`,
+    html: `<div class="fc-cluster fc-cluster-${worst}" style="width:${size}px;height:${size}px">${count}</div>`,
     iconSize: [size, size],
     iconAnchor: [size / 2, size / 2],
   })
@@ -167,38 +186,24 @@ export default function CalmMap({
   useEffect(() => {
     if (mapRef.current || !hostRef.current) return undefined
 
+    /* The view is pinned to India with a little slack.
+     *
+     * Without maxBounds a reader could pan to Xinjiang or Thailand, where the
+     * OSM tiles are labelled in scripts that are noise for this product. The
+     * padding is generous enough that panning still feels free near the coast,
+     * and minZoom stops the whole of Asia coming into frame. */
     const map = L.map(hostRef.current, {
       zoomControl: false,
       attributionControl: true,
       worldCopyJump: false,
-      minZoom: 3,
+      minZoom: 4,
       zoomSnap: 0.25,
+      maxBounds: PAN_BOUNDS,
+      maxBoundsViscosity: 0.85,
     })
 
     map.fitBounds(INDIA_BOUNDS, { padding: [12, 12] })
 
-    /* The India outline is a fallback, not first paint.
-     *
-     * Imported statically it was 69 KB of JSON parsed as a JS module in the
-     * critical path, and first contentful paint measured 5.15 s. Loading it
-     * after the map exists costs nothing visually — the tiles are still
-     * arriving — and takes it off the blocking path. */
-    import('../../data/india-outline.json')
-      .then(({ default: outline }) => {
-        if (!mapRef.current) return
-        outlineLayerRef.current = L.geoJSON(outline, {
-          interactive: false,
-          style: (feature) =>
-            feature.properties.kind === 'country'
-              ? { className: 'fc-outline-country' }
-              : { className: 'fc-outline-state' },
-        }).addTo(map)
-        outlineLayerRef.current.bringToBack()
-      })
-      .catch(() => {
-        // Without the outline a tile failure shows an empty ground. The warning
-        // note still appears, so the screen is never silently wrong.
-      })
 
     L.control.zoom({ position: 'bottomright' }).addTo(map)
     markerLayerRef.current = L.layerGroup().addTo(map)
@@ -257,11 +262,50 @@ export default function CalmMap({
     })
 
     layer.addTo(map)
-    // Tiles above the outline, markers above both.
     layer.bringToBack()
-    outlineLayerRef.current?.bringToBack()
     tileLayerRef.current = layer
   }, [mapType])
+
+  /* The boundary outline appears only when tiles have actually failed.
+   *
+   * Pass 2 drew it on every load, filled, which greyed out India underneath
+   * working tiles. It is now loaded lazily on first failure — which also keeps
+   * 69 KB of JSON out of the critical path — and removed again the moment tiles
+   * recover, so a brief rate-limit blip does not leave a stale overlay behind. */
+  useEffect(() => {
+    const map = mapRef.current
+    if (!map) return undefined
+
+    if (!tilesFailed) {
+      if (outlineLayerRef.current) {
+        map.removeLayer(outlineLayerRef.current)
+        outlineLayerRef.current = null
+      }
+      return undefined
+    }
+
+    let cancelled = false
+    import('../../data/india-outline.json')
+      .then(({ default: outline }) => {
+        if (cancelled || !mapRef.current || outlineLayerRef.current) return
+        outlineLayerRef.current = L.geoJSON(outline, {
+          interactive: false,
+          style: (feature) =>
+            feature.properties.kind === 'country'
+              ? { className: 'fc-outline-country' }
+              : { className: 'fc-outline-state' },
+        }).addTo(mapRef.current)
+        outlineLayerRef.current.bringToBack()
+      })
+      .catch(() => {
+        // The "tiles unavailable" note still shows, so the screen is never
+        // silently wrong even without the boundary layer.
+      })
+
+    return () => {
+      cancelled = true
+    }
+  }, [tilesFailed])
 
   // --- markers ------------------------------------------------------------
   const render = useCallback(() => {

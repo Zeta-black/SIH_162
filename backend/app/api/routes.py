@@ -15,6 +15,7 @@ from fastapi import APIRouter, HTTPException, Query, Response
 from pydantic import BaseModel, Field
 
 from app.config import settings
+from app import places
 from app.schemas import (
     ClassifiedEvent,
     ClassifyRequest,
@@ -534,17 +535,30 @@ def _coord_title(lat: float, lon: float) -> str:
 def _title(e, facility: str | None, near: bool) -> str:
     """A name an operator can tell apart from the one above it in the queue.
 
-    Many OpenStreetMap industrial features have no `name` tag, so the context
-    layer falls back to the category label. Three unnamed gas/oil features then
-    produced three rows all reading "Gas / oil infrastructure", which is useless
-    as a work list. When the name is a generic category label rather than a real
-    one, the position is appended to disambiguate.
+    Most OpenStreetMap industrial features in this archive have no `name` tag, so
+    the context layer falls back to the category label — and three unnamed
+    gas/oil features then produced three identical rows.
+
+    Pass 2 disambiguated them with coordinates, which was unique but unreadable:
+    "Gas / oil infrastructure · 21.105°N, 72.642°E". A place name from the
+    monitored-area gazetteer is what a person would actually say. Coordinates
+    remain the last resort for a point outside every known area, because a wrong
+    place name would be worse than an ugly one.
     """
-    if not (facility and near):
-        return _coord_title(e.latitude, e.longitude)
-    if facility in _GENERIC_FACILITY_LABELS:
-        return f"{facility} · {_coord_title(e.latitude, e.longitude)}"
-    return facility
+    place = places.place_for(e.latitude, e.longitude)
+
+    if facility and near:
+        if facility not in _GENERIC_FACILITY_LABELS:
+            return facility
+        # A generic category label, so qualify it with where it is.
+        return f"{facility} · {place}" if place else (
+            f"{facility} · {_coord_title(e.latitude, e.longitude)}"
+        )
+
+    # No facility in radius: name it after its class and its area.
+    if place:
+        return f"{e.label_display} · {place}"
+    return _coord_title(e.latitude, e.longitude)
 
 
 def _subtitle(e, facility: str | None, near: bool) -> str:

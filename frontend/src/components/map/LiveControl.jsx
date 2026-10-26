@@ -1,5 +1,5 @@
 import { useEffect, useId, useMemo, useRef, useState } from 'react'
-import { IconChevronDown, IconClose, IconFlame } from './mapicons.jsx'
+import { IconChevronDown, IconFlame } from './mapicons.jsx'
 
 /**
  * The top-left control. Product mark, one segmented Live | Past data, and one
@@ -58,6 +58,9 @@ export default function LiveControl({
   onSelectRange,
   loading,
   counts,
+  // Which surface the user asked for. Separate from what the payload says, so
+  // the control responds to a click without waiting for a fetch.
+  requestedPast = false,
 }) {
   const [, forceTick] = useState(0)
   const [pickerOpen, setPickerOpen] = useState(false)
@@ -91,9 +94,11 @@ export default function LiveControl({
     }
   }, [])
 
-  const isPast = provenance?.surface === 'past'
+  const isPast = requestedPast
   const feed = provenance?.feed ?? {}
   const state = provenance?.state
+  // The payload has not caught up with the requested surface yet.
+  const settling = provenance != null && (provenance.surface === 'past') !== requestedPast
 
   // Minutes elapsed since the backend computed the age, added back on, so the
   // line keeps counting between fetches instead of freezing at its fetch value.
@@ -113,7 +118,15 @@ export default function LiveControl({
     isPast ? 'past' : state === 'delayed' ? 'warn' : state === 'unavailable' ? 'warn' : 'ok'
 
   let line
-  if (loading && !provenance) {
+  /* No payload means nothing to describe.
+   *
+   * This guard used to be `loading && !provenance`, which looked equivalent and
+   * was not: switching surface clears the payload a tick before the fetch sets
+   * `loading`, so for one render `provenance` was undefined while `isPast` was
+   * already true — and the Past branch below dereferenced `provenance.range`
+   * and threw, blanking the whole control. The absence of data is the condition;
+   * whether a request happens to be in flight is not. */
+  if (!provenance || settling) {
     line = null
   } else if (isPast) {
     // The floating replay badge is hidden on narrow screens, so the card itself
@@ -274,23 +287,15 @@ export default function LiveControl({
 }
 
 /**
- * The replay banner. A thin accent rule along the top edge plus one line, so
- * Past data is unmistakable from across a room and can never be mistaken for a
- * live screen.
+ * The replay indicator: a single thin accent rule along the top edge.
+ *
+ * Pass 2 also floated a badge here repeating "Past data · <range> — no alerts
+ * are sent", which the freshness line in the card already says. Two copies of
+ * one message is clutter, and the floating one also collided with the search
+ * bar. The rule carries the "this is not live" signal visually; the card
+ * carries the words.
  */
-export function PastBanner({ provenance, onExit }) {
+export function PastBanner({ provenance }) {
   if (provenance?.surface !== 'past') return null
-  return (
-    <>
-      <div className="fc-past-rule" aria-hidden="true" />
-      <div className="fc-past-badge" role="status">
-        <span>
-          Past data · {provenance.range?.label ?? 'saved period'} — no alerts are sent
-        </span>
-        <button type="button" onClick={onExit} aria-label="Return to live">
-          <IconClose width={13} height={13} />
-        </button>
-      </div>
-    </>
-  )
+  return <div className="fc-past-rule" role="presentation" />
 }

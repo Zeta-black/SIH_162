@@ -1,8 +1,8 @@
 /* FIRETRACE design tokens.
  *
- * One file, every value. Components reference tokens and never literals, so the
- * dark theme is the same system with different numbers rather than a parallel
- * stylesheet — and so a reviewer can see the whole palette in one place.
+ * One file, every value. Components reference tokens and never literals, so a
+ * reviewer can see the whole palette in one place and a colour can be changed
+ * once rather than hunted for.
  *
  * Inter is bundled from node_modules (@fontsource-variable/inter), not a CDN.
  * A font that arrives over the network is a font that is missing on a venue
@@ -12,6 +12,18 @@
  */
 
 :root {
+  /* FIRETRACE is light-theme only.
+   *
+   * A dark theme shipped in Pass 2 and was a regression: it followed the OS
+   * setting, so a reviewer on a dark-mode machine got dark panels, near-black
+   * clusters and red markers that no longer stood out — while every Playwright
+   * screenshot, which defaults to light, looked correct. One theme that is
+   * right everywhere beats two where one is unreviewed.
+   *
+   * `color-scheme: light` is declared so the browser's own surfaces (form
+   * controls, scrollbars, the pre-paint background) stay light too. */
+  color-scheme: light;
+
   /* ---------------------------------------------------------------- grey
    * A 10-step ramp with a slight cool tint (hue 215). Warm greys fight the
    * amber and red status colours; a cool ground lets them read as signal. */
@@ -131,114 +143,4 @@
   --z-scrim: 900;
   --z-drawer: 1000;
   --z-palette: 1100;
-}
-
-/* ------------------------------------------------------------------ dark
- * The same system, different numbers. Built from the identical token names so
- * no component needs a dark-specific rule.
- *
- * Applies on an explicit [data-theme="dark"] and on the system preference
- * unless the user has explicitly chosen light. */
-@media (prefers-color-scheme: dark) {
-  :root:not([data-theme='light']) {
-    --g-0: #10151a;
-    --g-25: #141a20;
-    --g-50: #171d24;
-    --g-100: #1c232b;
-    --g-200: #272f39;
-    --g-300: #37414e;
-    --g-400: #566273;
-    --g-500: #7d8898;
-    --g-600: #9aa4b2;
-    --g-700: #bcc4cf;
-    --g-800: #dde2e8;
-    --g-900: #f2f5f8;
-
-    --brand: #6ea8f0;
-    --brand-ink: #a9cbf7;
-    --brand-wash: #16263a;
-    --brand-ring: rgba(110, 168, 240, 0.32);
-
-    --s-attn: #ef7a6e;
-    --s-attn-ink: #f6a79e;
-    --s-attn-wash: #3a1d1a;
-    --s-attn-line: #5e2b25;
-
-    --s-watch: #e0ab53;
-    --s-watch-ink: #efc983;
-    --s-watch-wash: #352713;
-    --s-watch-line: #56401d;
-
-    --s-normal: #5bbd8a;
-    --s-normal-ink: #8fd4ae;
-    --s-normal-wash: #16301f;
-    --s-normal-line: #24482f;
-
-    --s-unsure: #8d97a5;
-    --s-unsure-ink: #aab3bf;
-    --s-unsure-wash: #1f262e;
-    --s-unsure-line: #37414e;
-
-    --surface: var(--g-50);
-    --surface-raised: var(--g-100);
-    --surface-sunk: var(--g-25);
-    --surface-muted: var(--g-100);
-    --border: var(--g-200);
-    --border-strong: var(--g-300);
-    --map-void: var(--g-25);
-
-    --shadow-rest: 0 1px 2px rgba(0, 0, 0, 0.4), 0 2px 8px rgba(0, 0, 0, 0.32);
-    --shadow-raised: 0 2px 4px rgba(0, 0, 0, 0.42), 0 12px 28px rgba(0, 0, 0, 0.46);
-  }
-}
-
-:root[data-theme='dark'] {
-  --g-0: #10151a;
-  --g-25: #141a20;
-  --g-50: #171d24;
-  --g-100: #1c232b;
-  --g-200: #272f39;
-  --g-300: #37414e;
-  --g-400: #566273;
-  --g-500: #7d8898;
-  --g-600: #9aa4b2;
-  --g-700: #bcc4cf;
-  --g-800: #dde2e8;
-  --g-900: #f2f5f8;
-
-  --brand: #6ea8f0;
-  --brand-ink: #a9cbf7;
-  --brand-wash: #16263a;
-  --brand-ring: rgba(110, 168, 240, 0.32);
-
-  --s-attn: #ef7a6e;
-  --s-attn-ink: #f6a79e;
-  --s-attn-wash: #3a1d1a;
-  --s-attn-line: #5e2b25;
-
-  --s-watch: #e0ab53;
-  --s-watch-ink: #efc983;
-  --s-watch-wash: #352713;
-  --s-watch-line: #56401d;
-
-  --s-normal: #5bbd8a;
-  --s-normal-ink: #8fd4ae;
-  --s-normal-wash: #16301f;
-  --s-normal-line: #24482f;
-
-  --s-unsure: #8d97a5;
-  --s-unsure-ink: #aab3bf;
-  --s-unsure-wash: #1f262e;
-  --s-unsure-line: #37414e;
-
-  --surface: var(--g-50);
-  --surface-raised: var(--g-100);
-  --surface-sunk: var(--g-25);
-  --surface-muted: var(--g-100);
-  --border: var(--g-200);
-  --border-strong: var(--g-300);
-  --map-void: var(--g-25);
-
-  --shadow-rest: 0 1px 2px rgba(0, 0, 0, 0.4), 0 2px 8px rgba(0, 0, 0, 0.32);
-  --shadow-raised: 0 2px 4px rgba(0, 0, 0, 0.42), 0 12px 28px rgba(0, 0, 0, 0.46);
 }

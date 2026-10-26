@@ -94,8 +94,9 @@ const browser = await chromium.launch()
   )
   record(
     'A replay says plainly that no alerts are sent',
-    (await page.locator('.fc-past-badge').count()) === 1 &&
-      /no alerts are sent/i.test(await page.locator('.fc-past-badge').innerText()),
+    (await page.locator('.fc-past-rule').count()) === 1 &&
+      /no alerts are sent/i.test(freshLine),
+    freshLine,
   )
 
   // --- the map actually drew something -------------------------------------
@@ -211,8 +212,8 @@ const browser = await chromium.launch()
       fresh,
     )
     record(
-      'Live never shows the replay banner',
-      (await page.locator('.fc-past-badge').count()) === 0,
+      'Live never shows the replay indicator',
+      (await page.locator('.fc-past-rule').count()) === 0,
     )
   }
 
@@ -229,15 +230,74 @@ const browser = await chromium.launch()
     )
     if (ranges.length > 0) {
       await page.locator('.fc-range').first().click()
-      await page.waitForTimeout(3500)
+      // Selecting a period clears the screen and refetches, and a cold archive
+      // analysis measured ~3 s, so wait for the timeline rather than a guess.
+      await page.waitForSelector('.fc-timeline', { timeout: 30000 }).catch(() => {})
+      await page.waitForTimeout(1200)
       record(
         'Past data is unmistakable and says no alerts are sent',
-        (await page.locator('.fc-past-badge').count()) === 1 &&
-          /no alerts are sent/i.test(await page.locator('.fc-past-badge').innerText()),
+        (await page.locator('.fc-past-rule').count()) === 1 &&
+          /no alerts are sent/i.test(await page.locator('.fc-fresh').first().innerText()),
       )
       record('Past data shows the replay timeline', (await page.locator('.fc-timeline').count()) === 1)
     }
   }
+
+  /* --- tile blackout ------------------------------------------------------
+   *
+   * The boundary fallback only matters when tiles fail, and "it probably works"
+   * is not a claim worth making. Both tile hosts are blocked at the network
+   * layer and the page is reloaded, which is what a captive portal or a rate
+   * limit looks like from the browser's side. */
+  {
+    const ctx = await browser.newContext({ viewport: { width: 1366, height: 768 } })
+    const blind = await ctx.newPage()
+    await blind.route('**://tile.openstreetmap.org/**', (route) => route.abort())
+    await blind.route('**://server.arcgisonline.com/**', (route) => route.abort())
+    await blind.goto(`${WEB}/?demo=1#/`, { waitUntil: 'domcontentloaded' })
+    await blind.waitForSelector('.fc-live', { timeout: 60000 }).catch(() => {})
+    await blind.waitForTimeout(6000)
+
+    const warned = await blind.locator('.fc-tilewarn').count()
+    const warnText = warned ? await blind.locator('.fc-tilewarn').innerText() : ''
+    record(
+      'Tile blackout: the page says tiles are unavailable',
+      warned === 1 && /unavailable/i.test(warnText),
+      warnText,
+    )
+
+    const outline = await blind.locator('.fc-outline-country').count()
+    record(
+      'Tile blackout: the boundary outline is drawn',
+      outline > 0,
+      `${outline} country path(s), ${await blind.locator('.fc-outline-state').count()} states`,
+    )
+
+    const filled = await blind.evaluate(() => {
+      const el = document.querySelector('.fc-outline-country')
+      return el ? getComputedStyle(el).fill : null
+    })
+    record(
+      'Tile blackout: the outline has no fill',
+      filled === 'none',
+      String(filled),
+    )
+
+    record(
+      'Tile blackout: markers still render',
+      (await blind.locator('.fc-marker, .fc-cluster').count()) > 0,
+    )
+    await blind.screenshot({ path: `${OUT}/tile-blackout.png` })
+    await ctx.close()
+  }
+
+  /* --- tiles OK means no outline -------------------------------------------
+   * The regression this pass fixed: the outline was drawn on every load with a
+   * filled country polygon, greying out India under working tiles. */
+  record(
+    'Tiles OK: no boundary outline is drawn',
+    (await page.locator('.fc-outline-country').count()) === 0,
+  )
 
   // --- accessibility -------------------------------------------------------
   await page.goto(`${WEB}/?demo=1#/`, { waitUntil: 'domcontentloaded' })

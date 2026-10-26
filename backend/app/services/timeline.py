@@ -106,45 +106,19 @@ def _runs(events: list[HotspotEvent]) -> list[DateRange]:
 def available_ranges() -> list[dict[str, object]]:
     """Every period the Past-data picker may offer, newest first.
 
-    Generated from the data actually held — the frozen archive plus anything the
-    local store has ingested. Nothing here is hard-coded, so the picker cannot
-    advertise a week we do not have.
+    Generated from the frozen archive, because the archive is what Past data
+    actually serves.
+
+    An earlier version also offered rolling "Last 24 hours" / "Last 7 days"
+    windows built from the live store. Those dates exist in the store but not in
+    the archive, so selecting one produced an empty screen — the precise failure
+    this module exists to prevent, arrived at from the other direction. Recent
+    live data is what the Live segment is for.
     """
-    ranges: list[dict[str, object]] = []
-
-    # Rolling windows first, but only when the store genuinely holds that much.
-    store = get_store()
-    newest = _store_newest_date()
-    if newest is not None:
-        for days, label in ((1, "Last 24 hours"), (7, "Last 7 days")):
-            start = newest - timedelta(days=days - 1)
-            count = store.count_between(start.isoformat(), newest.isoformat())
-            if count > 0:
-                ranges.append(
-                    {
-                        "id": f"rolling-{days}",
-                        "kind": "rolling",
-                        "from": start.isoformat(),
-                        "to": newest.isoformat(),
-                        "label": label,
-                        "days": days,
-                        "detections": count,
-                    }
-                )
-
     snap = snapshot_service.load_snapshot()
-    if snap and snap.events:
-        ranges.extend(run.as_dict("archive") for run in _runs(snap.events))
-
-    return ranges
-
-
-def _store_newest_date() -> date | None:
-    try:
-        newest = get_store().newest_event_date()
-        return date.fromisoformat(newest) if newest else None
-    except Exception:  # noqa: BLE001 - the picker must never break the page
-        return None
+    if not snap or not snap.events:
+        return []
+    return [run.as_dict("archive") for run in _runs(snap.events)]
 
 
 def resolve_range(range_id: str | None) -> tuple[date, date] | None:

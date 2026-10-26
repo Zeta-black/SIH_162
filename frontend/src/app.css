@@ -1,8 +1,7 @@
 /* FIRETRACE — the operations screen.
  *
  * Every value here comes from tokens.css. If a literal colour or size appears
- * below, it is a bug: the dark theme works because components know only token
- * names.
+ * below, it is a bug.
  *
  * The look is deliberately quiet. Wow comes from restraint, precision and
  * speed — a soft map, one accent, generous whitespace, and motion only where it
@@ -82,11 +81,6 @@
   filter: saturate(0.18) brightness(1.08) contrast(0.9);
 }
 
-:root[data-theme='dark'] .fc-canvas .fc-tiles,
-.fc-theme-dark .fc-canvas .fc-tiles {
-  filter: saturate(0.2) brightness(0.62) contrast(1.05) invert(0.92) hue-rotate(180deg);
-}
-
 /* Satellite imagery is already the subject; leave it alone. */
 .fc-canvas .fc-tiles-satellite {
   filter: saturate(0.85) brightness(0.98);
@@ -128,18 +122,21 @@
 }
 .fc-canvas .leaflet-control-zoom a:hover { background: var(--surface-muted); color: var(--ink); }
 
-/* The bundled India outline, shown under the tiles so it is a floor rather than
-   an overlay. When tiles fail it is all that remains, and the map still reads as
-   an intentional map of India instead of grey nothing. */
+/* The bundled India outline is a FALLBACK ONLY.
+ *
+ * Pass 2 drew it on every load with a filled country polygon, which greyed out
+ * the whole subcontinent underneath perfectly good tiles. It is now added to the
+ * map only when tile loading actually fails, and it is drawn as a 1 px outline
+ * with no fill so it reads as a boundary rather than as a surface. */
 .fc-outline-country {
-  fill: var(--surface-muted);
+  fill: none;
   stroke: var(--border-strong);
   stroke-width: 1;
 }
 .fc-outline-state {
   fill: none;
   stroke: var(--border);
-  stroke-width: 0.75;
+  stroke-width: 1;
 }
 
 .fc-tilewarn {
@@ -207,22 +204,35 @@
 }
 .fc-marker-new { animation: fc-arrive 1.4s var(--ease-out) 2; }
 
+/* A light bubble with a dark count and a ring in the colour of the worst status
+   inside it. Pass 2's dark theme turned these near-black, which buried the one
+   thing the map exists to surface. */
 .fc-cluster {
   display: flex;
   align-items: center;
   justify-content: center;
   border-radius: var(--r-pill);
-  background: var(--surface);
-  border: 1px solid var(--border-strong);
+  background: var(--g-0);
+  border: 2px solid var(--border-strong);
   box-shadow: var(--shadow-rest);
   font-size: var(--t-12);
   font-weight: var(--w-medium);
-  color: var(--ink-2);
+  color: var(--ink);
   font-variant-numeric: tabular-nums;
   transition: transform var(--dur-fast) var(--ease);
 }
 .fc-cluster:hover { transform: scale(1.06); }
-.fc-cluster-attn { border-color: var(--s-attn); color: var(--s-attn-ink); }
+
+.fc-cluster-needs_attention {
+  border-color: var(--s-attn);
+  /* A faint wash as well as the ring, so a red cluster reads at a glance from
+     across a room rather than only on inspection. */
+  background: var(--s-attn-wash);
+  color: var(--s-attn-ink);
+}
+.fc-cluster-watch { border-color: var(--s-watch); color: var(--s-watch-ink); }
+.fc-cluster-not_sure { border-color: var(--s-unsure); }
+.fc-cluster-normal { border-color: var(--s-normal-line); }
 
 /* ======================================================================
    Panels
@@ -260,10 +270,11 @@
 
 .fc-seg {
   display: flex;
-  background: var(--surface-sunk);
+  background: var(--g-100);
+  border: 1px solid var(--border);
   border-radius: var(--r-sm);
-  padding: 2px;
-  gap: 2px;
+  padding: 3px;
+  gap: 3px;
 }
 .fc-seg-wrap { position: relative; flex: 1; display: flex; }
 .fc-seg-btn {
@@ -284,11 +295,25 @@
   white-space: nowrap;
   transition: background var(--dur-fast) var(--ease), color var(--dur-fast) var(--ease);
 }
-.fc-seg-btn:hover { color: var(--ink); }
+/* Only the active segment is raised.
+ *
+ * The inactive one must stay visibly flat: Pass 2 gave both a white fill on a
+ * near-white track, so at a glance Live and Past data both looked selected. The
+ * track is now clearly sunk and the active segment clearly lifted. */
+.fc-seg-btn:hover:not([aria-pressed='true']) {
+  color: var(--ink);
+  background: color-mix(in srgb, var(--g-0) 60%, transparent);
+}
+.fc-seg-btn[aria-pressed='false'] {
+  background: transparent;
+  box-shadow: none;
+  color: var(--ink-3);
+}
 .fc-seg-btn[aria-pressed='true'] {
-  background: var(--surface);
+  background: var(--g-0);
   color: var(--ink);
   box-shadow: var(--shadow-rest);
+  border: 1px solid var(--border);
 }
 
 .fc-dot {
@@ -428,6 +453,8 @@
 
 /* ---- Past mode chrome ------------------------------------------------ */
 /* A replay must be unmistakable from across a room. */
+/* The one visual marker that this is a replay. Thin, full width, unmistakable
+   from across a room, and it costs no layout space. */
 .fc-past-rule {
   position: absolute;
   top: 0;
@@ -436,37 +463,8 @@
   height: 3px;
   background: var(--brand);
   z-index: var(--z-toast);
+  pointer-events: none;
 }
-.fc-past-badge {
-  position: absolute;
-  top: 3px;
-  left: 50%;
-  transform: translateX(-50%);
-  z-index: var(--z-toast);
-  display: flex;
-  align-items: center;
-  gap: var(--sp-2);
-  background: var(--brand);
-  color: var(--g-0);
-  border-radius: 0 0 var(--r-sm) var(--r-sm);
-  padding: 5px var(--sp-3);
-  font-size: var(--t-12);
-  font-weight: var(--w-medium);
-  box-shadow: var(--shadow-rest);
-}
-:root[data-theme='dark'] .fc-past-badge { color: var(--g-0); }
-.fc-past-badge button {
-  border: 0;
-  background: transparent;
-  color: inherit;
-  cursor: pointer;
-  display: flex;
-  padding: 2px;
-  border-radius: 4px;
-  opacity: 0.85;
-}
-.fc-past-badge button:hover { opacity: 1; background: rgba(255, 255, 255, 0.18); }
-
 /* ---- search ---------------------------------------------------------- */
 .fc-searchwrap {
   position: absolute;
@@ -595,15 +593,6 @@
   color: var(--ink-inverse);
 }
 .fc-chip[aria-pressed='true'] .fc-swatch { box-shadow: 0 0 0 1.5px color-mix(in srgb, var(--ink-inverse) 55%, transparent); }
-
-/* Scoped to desktop on purpose.
- *
- * This selector is 0-2-0 and the mobile rule below is 0-1-0, so unscoped it won
- * the cascade inside the phone breakpoint and pinned the search bar back over
- * the Live card — even though the badge it keys on is display:none there. */
-@media (min-width: 761px) {
-  .fc-app:has(.fc-past-badge) .fc-searchwrap { top: 42px; }
-}
 
 /* ---- top-right cluster ----------------------------------------------- */
 .fc-topright {
@@ -907,6 +896,17 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+/* How many sites this merged row stands for. */
+.fc-queue-count {
+  flex: 0 0 auto;
+  font-size: var(--t-11);
+  font-weight: var(--w-medium);
+  color: var(--ink-3);
+  background: var(--surface-sunk);
+  border-radius: var(--r-pill);
+  padding: 1px 7px;
+  font-variant-numeric: tabular-nums;
 }
 
 /* ---- bottom-right controls ------------------------------------------- */
@@ -1328,13 +1328,6 @@
     padding: var(--sp-3);
   }
 
-  /* The replay badge becomes a row inside the card instead of a floating block
-     over the wordmark. */
-  .fc-past-badge {
-    position: static;
-    transform: none;
-    display: none;
-  }
   .fc-past-rule { height: 4px; }
 
   /* The summary line is dropped on a phone.
@@ -1355,15 +1348,23 @@
        freshness line. */
     top: 122px;
   }
+  /* Chips wrap rather than scroll.
+   *
+   * A horizontal scroller clipped the third chip at 390 px, so part of "Not
+   * sure" was always cut off and there was nothing to indicate it scrolled.
+   * Wrapping costs one extra row and shows all three. */
   .fc-filters {
-    flex-wrap: nowrap;
-    overflow-x: auto;
+    flex-wrap: wrap;
     justify-content: flex-start;
+    gap: 6px;
     margin-top: var(--sp-2);
-    padding-bottom: 2px;
-    scrollbar-width: none;
+    overflow: visible;
   }
-  .fc-filters::-webkit-scrollbar { display: none; }
+  .fc-chip {
+    height: 32px;
+    padding: 0 10px;
+    font-size: var(--t-11);
+  }
   .fc-results { max-height: 42vh; }
 
   .fc-queue { display: none; }

@@ -10,7 +10,7 @@
 //   4  API              every route the frontend calls, with timings
 //   5  Degradation      live -> cached -> archive, bad key, no network
 //   6  Pipeline         the existing replay/incident smoke test
-//   7  Browser          the real UI, axe, screenshots, zero console errors
+//   7  Browser          the real UI, axe, tile blackout, light-only theme
 //   8  Copy             no overclaiming or stale-dated string in the UI
 //   9  Live/Past        surfaces, provenance, and replay sending nothing
 //  10  GIS              GeoJSON layers and a GeoPackage that reads back
@@ -535,6 +535,18 @@ if (wanted('browser')) {
       env: { ...process.env, SMOKE_WEB: WEB },
     })
     check('Browser checks pass', code === 0, `exit ${code}`)
+
+    /* Light-theme-only check: the same screens under a light and a dark colour
+     * preference must be pixel-identical. Stronger than "no dark CSS exists",
+     * because it also catches a browser default or a third-party stylesheet
+     * reacting to the preference — which is exactly how Pass 2's dark theme
+     * reached a reviewer while every screenshot looked fine. */
+    const themeCode = await run(
+      process.execPath,
+      ['--no-deprecation', join(ROOT, 'scripts', 'checks', 'theme.mjs')],
+      { cwd: ROOT, stdio: 'inherit', env: { ...process.env, SMOKE_WEB: WEB } },
+    )
+    check('Renders identically under a dark colour preference', themeCode === 0, `exit ${themeCode}`)
   } else {
     check('Dashboard starts', false)
   }

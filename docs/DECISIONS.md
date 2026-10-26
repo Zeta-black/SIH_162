@@ -186,3 +186,52 @@ Newest at the bottom.
   data-acquisition work with external dependencies, and the priority order put
   UI, notifications and the gate first; each is recorded honestly in
   `docs/PS_COMPLIANCE.md` rather than quietly skipped.
+
+
+## Fix pass - visual regressions
+
+- **Deleted the dark theme entirely; light only, with `color-scheme: light`** ·
+  it followed the OS setting, so a reviewer on a dark-mode machine saw dark
+  panels, near-black clusters and red markers that no longer stood out — while
+  every Playwright screenshot, which defaults to light, looked correct. One
+  reviewed theme beats two where one is unreviewed · reverse by restoring the
+  dark token block from `git show pre-fix:frontend/src/tokens.css`.
+- **The boundary outline is added only after tiles actually fail, and has no
+  fill** · Pass 2 drew a filled country polygon on every load, greying out the
+  whole subcontinent under working tiles · reverse in `CalmMap`'s tilesFailed
+  effect.
+- **Clusters are light bubbles with a ring in the worst status they contain** ·
+  a red cluster must stay the most visible thing on the map even when sites are
+  bundled up · reverse in `.fc-cluster-*`.
+- **The inactive segment is explicitly flat** · both segments had a white fill on
+  a near-white track, so Live and Past data both looked selected · reverse in
+  `.fc-seg-btn[aria-pressed='false']`.
+- **One replay message, not two** · the floating badge repeated what the card's
+  freshness line already said, and collided with the search bar. The thin top
+  rule carries the signal, the card carries the words · reverse by restoring
+  `PastBanner` from `git show pre-fix`.
+- **The segmented control reflects the REQUESTED surface, and switching clears
+  the payload first** · keeping stale data while the next fetch ran left the
+  card claiming "Showing 1-10 Sep 2026" after the user pressed Live, which is
+  the one claim this interface must never make · reverse in `MapApp.goLive`.
+- **maxBounds pins the view near India** · note the limit: India is as tall as it
+  is wide, so a 16:9 viewport fitted to it will always include some neighbouring
+  territory. maxBounds stops panning *into* it; it cannot crop it out of a
+  fitted view, and the OSM labels there cannot be restyled without a different
+  tile provider.
+- **Unnamed OSM features are named after the monitored area, not coordinates** ·
+  `app/places.py` maps a point to e.g. "Hazira, Gujarat" from the same region
+  definitions the dataset was built from; a point outside every area gets no
+  place name rather than a guessed one · reverse in `routes._title`.
+- **Near-identical queue rows merge with a count** · several unnamed features in
+  one area legitimately share a title, and three consecutive identical rows read
+  as a rendering bug · reverse in `MapApp.queue`.
+- **The Past picker no longer offers rolling live windows** · "Last 24 hours" came
+  from the live store but Past data serves the archive, so selecting it produced
+  an empty screen — the same dishonesty as a hard-coded range, arrived at from
+  the other direction · reverse in `timeline.available_ranges`.
+- **`?demo=1` resolves to a concrete period before the first map request** ·
+  resolving it afterwards showed the whole archive and then switched, a visible
+  flicker and a real non-determinism · reverse in `MapApp`.
+- **Mobile filter chips wrap instead of scrolling** · the third chip was always
+  clipped at 390 px with nothing to indicate it scrolled.

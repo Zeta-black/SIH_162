@@ -103,10 +103,43 @@ export default function MapApp() {
   const [deepLinkSite] = useState(() => readParam('site'))
   const deepLinkDone = useRef(false)
 
-  const isPast = data?.provenance?.surface === 'past'
+  /* Which surface the user asked for. The payload confirms it a moment later,
+   * but the control has to respond to the click immediately or it feels broken
+   * and, worse, briefly shows the wrong segment as active. */
+  const isPast = rangeId !== null && rangeId !== undefined
+
+  /* `?demo=1` names no particular period, so it has to be resolved to a real one
+   * before the first map request.
+   *
+   * Resolving it *after* the first fetch — which is what Pass 2 did — meant the
+   * screen briefly showed the whole archive and then switched to the range, a
+   * visible flicker on the demo links and a genuine non-determinism that the
+   * theme check caught as two different screenshots. One extra timeline call is
+   * cheaper than both. */
+  useEffect(() => {
+    if (rangeId !== 'latest-archive') return
+    let cancelled = false
+    api
+      .timeline()
+      .then(({ ranges }) => {
+        if (cancelled) return
+        const archive = (ranges ?? []).find((r) => r.kind === 'archive')
+        setRangeId(archive ? archive.id : null)
+      })
+      .catch(() => {
+        // No timeline means no archive to pick; fall back to Live rather than
+        // sitting on an unresolvable placeholder.
+        if (!cancelled) setRangeId(null)
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [rangeId])
 
   // ----------------------------------------------------------- load map
   const load = useCallback(async () => {
+    // Hold off while `?demo=1` is still being resolved to a real period.
+    if (rangeId === 'latest-archive') return
     const id = ++reqRef.current
     setLoading(true)
     try {
@@ -114,7 +147,7 @@ export default function MapApp() {
         bbox: INDIA_BBOX,
         days: 1,
         mode: rangeId ? 'demo' : 'auto',
-        range: rangeId && rangeId !== 'latest-archive' ? rangeId : undefined,
+        range: rangeId ?? undefined,
       })
       if (id !== reqRef.current) return
 
@@ -151,14 +184,6 @@ export default function MapApp() {
     const timer = setInterval(load, MAP_POLL_MS)
     return () => clearInterval(timer)
   }, [load, isPast])
-
-  // `?demo=1` with no explicit range resolves to the newest archive period once
-  // the ranges are known, rather than hard-coding one.
-  useEffect(() => {
-    if (rangeId !== 'latest-archive') return
-    const archive = (data?.ranges ?? []).find((r) => r.kind === 'archive')
-    if (archive) setRangeId(archive.id)
-  }, [rangeId, data?.ranges])
 
   // --------------------------------------------------------- notifications
   const notifications = useNotificationFeed(api, { isPast })
@@ -240,10 +265,32 @@ export default function MapApp() {
     return out
   }, [sites])
 
-  const queue = useMemo(
-    () => visible.filter((s) => s.status === 'needs_attention' || s.status === 'not_sure'),
-    [visible],
-  )
+  /* The triage queue, with near-identical rows merged.
+   *
+   * Several unnamed features in one industrial area now share a title like
+   * "Gas / oil infrastructure · Hazira, Gujarat", which is the right label but
+   * made three consecutive rows look like a rendering bug. One row per title
+   * keeps the list a work list; the count tells the operator there is more than
+   * one, and the markers are all still on the map. */
+  const queue = useMemo(() => {
+    const urgent = visible.filter(
+      (s) => s.status === 'needs_attention' || s.status === 'not_sure',
+    )
+    const byTitle = new Map()
+    for (const site of urgent) {
+      const existing = byTitle.get(site.title)
+      if (!existing) {
+        byTitle.set(site.title, { ...site, merged: 1 })
+      } else {
+        existing.merged += 1
+        // Keep the most urgent of the group as the row's target.
+        if (site.priority_score > existing.priority_score) {
+          byTitle.set(site.title, { ...site, merged: existing.merged })
+        }
+      }
+    }
+    return [...byTitle.values()]
+  }, [visible])
 
   const selected = useMemo(
     () => sites.find((s) => s.id === selectedId) ?? null,
@@ -322,12 +369,22 @@ export default function MapApp() {
     }
   }, [selected, rangeId])
 
+  /* Switching surface clears what is on screen first.
+   *
+   * Keeping the previous payload while the next one loads meant that pressing
+   * Live left the card reading "Showing 1-10 Sep 2026 — no alerts are sent" for
+   * as long as the live fetch took. A stale surface claim is the one thing this
+   * interface must never make, so the skeleton shows instead until real data
+   * for the requested surface arrives. */
   const goLive = useCallback(() => {
+    setData(null)
     setRangeId(null)
     setDayIndex(0)
+    setSelectedId(null)
   }, [])
 
   const selectRange = useCallback((range) => {
+    setData(null)
     setRangeId(range.id)
     setSelectedId(null)
   }, [])
@@ -438,6 +495,7 @@ export default function MapApp() {
         onSelectRange={selectRange}
         loading={loading}
         counts={counts}
+        requestedPast={isPast}
       />
 
       <div className="fc-searchwrap">
@@ -504,6 +562,11 @@ export default function MapApp() {
                 }}
               />
               <span className="fc-queue-name">{s.title}</span>
+              {s.merged > 1 && (
+                <span className="fc-queue-count" aria-label={`${s.merged} sites here`}>
+                  {s.merged}
+                </span>
+              )}
             </button>
           ))}
         </div>
