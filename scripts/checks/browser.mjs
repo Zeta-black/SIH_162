@@ -58,24 +58,44 @@ const browser = await chromium.launch()
   // --- load, in the offline archive so this check never depends on NASA ----
   const t0 = Date.now()
   await page.goto(`${WEB}/?demo=1#/`, { waitUntil: 'domcontentloaded' })
-  await page.waitForSelector('.m-summary b', { timeout: 60000 })
+  await page.waitForSelector('.fc-summary b', { timeout: 60000 })
   const interactiveMs = Date.now() - t0
   record('App becomes interactive', interactiveMs < 15000, `${interactiveMs} ms`)
 
   // --- the ten-second test -------------------------------------------------
-  const summary = (await page.locator('.m-summary').first().innerText()).replace(/\s+/g, ' ')
+  const summary = (await page.locator('.fc-summary').first().innerText()).replace(/\s+/g, ' ')
   record(
     'Summary states the picture in words',
     /need attention/.test(summary) && /normal/.test(summary),
     summary,
   )
 
-  const chip = await page.locator('.m-brandcard .m-chip').first().innerText()
-  record('Provenance chip is present and unambiguous', /Replay|Live|Offline/.test(chip), chip)
+  /* Pass 2 moved the provenance wording. The segmented control says which
+     surface is active and the line under it says how old the data is; the chip
+     text "Replay / Offline" is gone. So the checks became: the Past segment is
+     the pressed one, the banner is present and says alerts are not sent, and
+     the freshness line names the period rather than claiming freshness. */
+  const freshLine = await page.locator('.fc-fresh').first().innerText()
+  const pastPressed = await page
+    .locator('.fc-seg-btn', { hasText: 'Past data' })
+    .first()
+    .getAttribute('aria-pressed')
   record(
-    'A replay is not labelled live',
-    /Replay/.test(chip) && !/^Live/.test(chip),
-    chip,
+    'Past data is the active surface, not Live',
+    pastPressed === 'true' &&
+      (await page.locator('.fc-seg-btn', { hasText: /^Live$/ }).first().getAttribute('aria-pressed')) ===
+        'false',
+    `past=${pastPressed}`,
+  )
+  record(
+    'The freshness line names the period, not a freshness claim',
+    /Showing/.test(freshLine) && !/Updated/.test(freshLine),
+    freshLine,
+  )
+  record(
+    'A replay says plainly that no alerts are sent',
+    (await page.locator('.fc-past-badge').count()) === 1 &&
+      /no alerts are sent/i.test(await page.locator('.fc-past-badge').innerText()),
   )
 
   // --- the map actually drew something -------------------------------------
@@ -88,7 +108,7 @@ const browser = await chromium.launch()
   if (tiles > 0) record('Basemap tiles loaded', true, `${tiles} tiles`)
   else warn('Basemap tiles did not load', 'OSM throttled this run; not a code failure')
 
-  const marks = (await page.locator('.m-marker').count()) + (await page.locator('.m-cluster').count())
+  const marks = (await page.locator('.fc-marker').count()) + (await page.locator('.fc-cluster').count())
   record('Detections are on the map', marks > 0, `${marks} markers/clusters`)
 
   // The one hard assertion about the basemap, and the important one: a tile
@@ -102,23 +122,23 @@ const browser = await chromium.launch()
   )
 
   // --- open the top event --------------------------------------------------
-  await page.locator('.m-attnrow').first().click()
-  await page.waitForSelector('.m-card-title', { timeout: 15000 })
+  await page.locator('.fc-queue-row').first().click()
+  await page.waitForSelector('.fc-card-title', { timeout: 15000 })
   const cardT0 = Date.now()
-  const title = await page.locator('.m-card-title').innerText()
-  const verdict = await page.locator('.m-verdict').innerText()
-  const why = await page.locator('.m-why li').allInnerTexts()
+  const title = await page.locator('.fc-card-title').innerText()
+  const verdict = await page.locator('.fc-verdict').innerText()
+  const why = await page.locator('.fc-why li').allInnerTexts()
   record('Event card opens', Date.now() - cardT0 < 3000, title)
   record('Verdict is a plain sentence', verdict.length > 20 && verdict.endsWith('.'), verdict.slice(0, 72))
   record('Why lines are present and bounded', why.length > 0 && why.length <= 3, `${why.length} lines`)
-  record('Status chip on the card', (await page.locator('.m-status-chip').count()) === 1)
+  record('Status chip on the card', (await page.locator('.fc-status').count()) === 1)
 
   await page.screenshot({ path: `${OUT}/smoke-card.png` })
 
   // --- evidence drawer -----------------------------------------------------
-  await page.locator('.m-btn', { hasText: 'See evidence' }).click()
-  await page.waitForSelector('.m-drawer', { timeout: 10000 })
-  const groups = await page.locator('.m-group-title').allInnerTexts()
+  await page.locator('.fc-btn', { hasText: 'See evidence' }).click()
+  await page.waitForSelector('.fc-drawer', { timeout: 10000 })
+  const groups = await page.locator('.fc-group-title').allInnerTexts()
   const wanted = ['HEAT', 'PLACE', 'HISTORY', 'CONTEXT']
   record(
     'Evidence is grouped Heat / Place / History / Context',
@@ -127,71 +147,101 @@ const browser = await chromium.launch()
   )
   record(
     'The causation caveat is shown',
-    (await page.locator('.m-drawer-body').innerText()).includes('not proof of cause'),
+    (await page.locator('.fc-drawer-body').innerText()).includes('not proof of cause'),
   )
 
   // Numbers must be behind the fold, not on the main screen.
-  const foldClosed = await page.locator('.m-fold:not([open])').count()
+  const foldClosed = await page.locator('.fc-fold:not([open])').count()
   record('Expert numbers stay folded by default', foldClosed === 1)
 
-  await page.locator('.m-fold > summary').click()
+  await page.locator('.fc-fold > summary').click()
   await page.waitForTimeout(250)
-  const kv = await page.locator('.m-fold-body').innerText()
+  const kv = await page.locator('.fc-fold-body').innerText()
   record('Model score is labelled as a score, not a probability', /Model score/i.test(kv))
   record('Priority is separate from the score', /Operational priority/i.test(kv))
   record('Observation and retrieval times are both shown', /Observed at/.test(kv) && /Retrieved at/.test(kv))
   await page.screenshot({ path: `${OUT}/smoke-evidence.png` })
 
-  await page.locator('.m-drawer .m-close').click()
+  await page.locator('.fc-drawer .fc-iconbtn-sm').click()
   await page.waitForTimeout(300)
-  record('Evidence drawer closes', (await page.locator('.m-drawer').count()) === 0)
+  record('Evidence drawer closes', (await page.locator('.fc-drawer').count()) === 0)
 
   // --- keyboard: Escape closes the card ------------------------------------
   await page.keyboard.press('Escape')
   await page.waitForTimeout(300)
-  record('Escape closes the event card', (await page.locator('.m-sitecard').count()) === 0)
+  record('Escape closes the event card', (await page.locator('.fc-sitecard').count()) === 0)
 
   // --- filters -------------------------------------------------------------
-  const before = await page.locator('.m-marker, .m-cluster').count()
-  await page.locator('.m-filter', { hasText: 'Needs attention' }).click()
+  const before = await page.locator('.fc-marker, .fc-cluster').count()
+  await page.locator('.fc-chip', { hasText: 'Needs attention' }).click()
   await page.waitForTimeout(900)
-  const after = await page.locator('.m-marker, .m-cluster').count()
+  const after = await page.locator('.fc-marker, .fc-cluster').count()
   record('Filter chip changes the map', after !== before, `${before} -> ${after}`)
-  await page.locator('.m-filter', { hasText: 'Needs attention' }).click()
+  await page.locator('.fc-chip', { hasText: 'Needs attention' }).click()
   await page.waitForTimeout(600)
 
   // --- search --------------------------------------------------------------
-  await page.locator('.m-search input').fill('refinery')
+  await page.locator('.fc-search input').fill('refinery')
   await page.waitForTimeout(1400)
-  const hits = await page.locator('.m-result').count()
+  const hits = await page.locator('.fc-result').count()
   record('Search returns facility matches', hits > 0, `${hits} results`)
   if (hits > 0) {
-    await page.locator('.m-result').first().click()
+    await page.locator('.fc-result').first().click()
     await page.waitForTimeout(1600)
     record('Selecting a result navigates the map', true)
   }
-  await page.locator('.m-search input').fill('')
+  await page.locator('.fc-search input').fill('')
   await page.waitForTimeout(400)
 
-  // --- source switch -------------------------------------------------------
-  const switchBtn = page.locator('.m-brandcard button', { hasText: /Try live|Use archive/ })
-  if ((await switchBtn.count()) > 0) {
-    const label = await switchBtn.first().innerText()
-    await switchBtn.first().click()
-    // Switching to live may legitimately take a while or fail; either is fine,
-    // what matters is that the chip never lies about which state it is in.
+  // --- Live / Past data switch ---------------------------------------------
+  /* The segmented control replaced Pass 1's "Try live / Use archive" button.
+   * Switching to Live may legitimately be slow or come back empty; either is
+   * fine. What matters is that the freshness line never describes a state the
+   * data is not in, and that a replay never lands under the Live segment. */
+  const liveSeg = page.locator('.fc-seg-btn', { hasText: /^Live$/ })
+  if ((await liveSeg.count()) > 0) {
+    await liveSeg.first().click()
     await page.waitForTimeout(12000)
-    const newChip = await page.locator('.m-brandcard .m-chip').first().innerText()
+    const fresh = await page.locator('.fc-fresh').first().innerText()
+    const pressed = await liveSeg.first().getAttribute('aria-pressed')
     record(
-      'Source switch keeps the chip honest',
-      /Live|Offline|Replay/.test(newChip),
-      `${label} -> ${newChip}`,
+      'Switching to Live keeps the freshness line honest',
+      pressed === 'true' &&
+        /Updated|No new detections|Feed delayed|Waiting for the first update/.test(fresh),
+      fresh,
     )
+    record(
+      'Live never shows the replay banner',
+      (await page.locator('.fc-past-badge').count()) === 0,
+    )
+  }
+
+  // --- Past data -----------------------------------------------------------
+  const pastSeg = page.locator('.fc-seg-btn', { hasText: 'Past data' })
+  if ((await pastSeg.count()) > 0) {
+    await pastSeg.first().click()
+    await page.waitForTimeout(900)
+    const ranges = await page.locator('.fc-range-label').allInnerTexts()
+    record(
+      'Past data lists real saved periods',
+      ranges.length > 0 && ranges.every((r) => /\d/.test(r)),
+      ranges.slice(0, 3).join(' | '),
+    )
+    if (ranges.length > 0) {
+      await page.locator('.fc-range').first().click()
+      await page.waitForTimeout(3500)
+      record(
+        'Past data is unmistakable and says no alerts are sent',
+        (await page.locator('.fc-past-badge').count()) === 1 &&
+          /no alerts are sent/i.test(await page.locator('.fc-past-badge').innerText()),
+      )
+      record('Past data shows the replay timeline', (await page.locator('.fc-timeline').count()) === 1)
+    }
   }
 
   // --- accessibility -------------------------------------------------------
   await page.goto(`${WEB}/?demo=1#/`, { waitUntil: 'domcontentloaded' })
-  await page.waitForSelector('.m-summary b', { timeout: 60000 })
+  await page.waitForSelector('.fc-summary b', { timeout: 60000 })
   await page.waitForTimeout(2000)
   await page.addScriptTag({ content: AXE })
   const axeResult = await page.evaluate(async () => {
@@ -254,7 +304,7 @@ for (const [width, height, tag] of VIEWPORTS) {
   page.on('pageerror', (e) => errs.push(`pageerror: ${e.message}`))
 
   await page.goto(`${WEB}/?demo=1#/`, { waitUntil: 'domcontentloaded' })
-  await page.waitForSelector('.m-summary b', { timeout: 60000 }).catch(() => {})
+  await page.waitForSelector('.fc-summary b', { timeout: 60000 }).catch(() => {})
   await page.waitForTimeout(4000)
   await page.screenshot({ path: `${OUT}/main-${tag}.png` })
 
@@ -266,7 +316,7 @@ for (const [width, height, tag] of VIEWPORTS) {
   // Our own UI must be present at every size. The summary and the map
   // container are ours; tile delivery is not.
   const ownUi =
-    (await page.locator('.m-brandcard').count()) === 1 &&
+    (await page.locator('.fc-live').count()) === 1 &&
     (await page.locator('.leaflet-container').count()) === 1
 
   /* Tile count is reported, not asserted, in this sweep.

@@ -164,16 +164,31 @@ def resolve_range(range_id: str | None) -> tuple[date, date] | None:
             )
 
     # Also accept a literal from:to, so a deep link keeps working after the
-    # underlying runs shift.
+    # underlying runs shift — but only when we actually hold detections in it.
+    # Accepting any well-formed span would let a link render an empty week as
+    # though it were a real period, which is the whole failure this module
+    # exists to prevent.
     if ":" in range_id:
         try:
             raw_start, raw_end = range_id.split(":", 1)
             start, end = date.fromisoformat(raw_start), date.fromisoformat(raw_end)
-            if start <= end:
-                return start, end
         except ValueError:
             return None
+        if start > end:
+            return None
+        if _holds_detections(start, end):
+            return start, end
     return None
+
+
+def _holds_detections(start: date, end: date) -> bool:
+    """Whether any stored or archived detection falls inside this span."""
+    if get_store().count_between(start.isoformat(), end.isoformat()) > 0:
+        return True
+    snap = snapshot_service.load_snapshot()
+    if snap and snap.events:
+        return any(start <= e.acquisition_date <= end for e in snap.events)
+    return False
 
 
 # ---------------------------------------------------------------------------

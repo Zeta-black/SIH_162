@@ -11,12 +11,16 @@
 //   5  Degradation      live -> cached -> archive, bad key, no network
 //   6  Pipeline         the existing replay/incident smoke test
 //   7  Browser          the real UI, axe, screenshots, zero console errors
+//   8  Copy             no overclaiming or stale-dated string in the UI
+//   9  Live/Past        surfaces, provenance, and replay sending nothing
+//  10  GIS              GeoJSON layers and a GeoPackage that reads back
 //
 // Any group can be run alone:  npm run smoke -- --only api
 
 import { spawn } from 'node:child_process'
 import { createServer } from 'node:net'
-import { existsSync, readFileSync } from 'node:fs'
+import { existsSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import {
   BACKEND,
@@ -79,6 +83,26 @@ async function get(path, timeoutMs = 120000) {
     return { ok: res.ok, status: res.status, ms, body }
   } catch (err) {
     return { ok: false, status: 0, ms: Date.now() - started, body: null, error: err.name }
+  } finally {
+    clearTimeout(timer)
+  }
+}
+
+/** POST with no body, for the endpoints that only act. */
+async function postPath(path, timeoutMs = 60000) {
+  const controller = new AbortController()
+  const timer = setTimeout(() => controller.abort(), timeoutMs)
+  try {
+    const res = await fetch(`${API}${path}`, { method: 'POST', signal: controller.signal })
+    let body = null
+    try {
+      body = await res.json()
+    } catch {
+      // Some POSTs answer with no JSON; the status still counts.
+    }
+    return { ok: res.ok, status: res.status, body }
+  } catch (err) {
+    return { ok: false, status: 0, body: null, error: err.name }
   } finally {
     clearTimeout(timer)
   }
@@ -284,7 +308,13 @@ if (wanted('unit')) {
 }
 
 // ----------------------------------------------- start the backend for 4-7
-const needsServer = wanted('api') || wanted('degradation') || wanted('pipeline') || wanted('browser')
+const needsServer =
+  wanted('api') ||
+  wanted('degradation') ||
+  wanted('pipeline') ||
+  wanted('browser') ||
+  wanted('livepast') ||
+  wanted('gis')
 
 if (needsServer) {
   for (const [port, what] of [[API_PORT, 'smoke API'], [WEB_PORT, 'smoke web']]) {
@@ -507,6 +537,248 @@ if (wanted('browser')) {
     check('Browser checks pass', code === 0, `exit ${code}`)
   } else {
     check('Dashboard starts', false)
+  }
+}
+
+// =====================================================================  8
+/* UI copy.
+ *
+ * A grep is a blunt instrument, but one that runs on every commit beats a style
+ * guide nobody re-reads. These are the phrases that would overclaim, plus the
+ * stale-date failure the Pass 1 chrome actually shipped.
+ */
+if (wanted('copy')) {
+  group('8  UI copy and freshness')
+
+  const tracked = await new Promise((resolve) => {
+    const child = spawn('git', ['ls-files', 'frontend/src'], { cwd: ROOT, encoding: 'utf8' })
+    let out = ''
+    child.stdout.on('data', (d) => (out += d))
+    child.on('close', () => resolve(out.split('\n').filter(Boolean)))
+    child.on('error', () => resolve([]))
+  })
+
+  const FORBIDDEN = [
+    [/try\s+live/i, '"try live"'],
+    [/\breal[-\s]?time\b/i, '"real-time"'],
+    [/\binstant(ly|aneous)?\b/i, '"instant"'],
+    [/100\s*%\s*accurate/i, '"100% accurate"'],
+    [/AI[-\s]?(powered|driven)/i, '"AI-powered"'],
+    [/\b(1[0-2]|[1-9])\s*Sept?(ember)?\s+20\d\d/i, 'a hard-coded date'],
+  ]
+
+  const hits = []
+  for (const file of tracked) {
+    if (!/\.(jsx?|css|html)$/.test(file)) continue
+    const text = readFileSync(join(ROOT, file), 'utf8')
+    text.split('\n').forEach((line, i) => {
+      const trimmed = line.trim()
+      // A comment may name the rule it enforces.
+      if (trimmed.startsWith('*') || trimmed.startsWith('//') || trimmed.startsWith('/*')) return
+      for (const [pattern, label] of FORBIDDEN) {
+        if (pattern.test(line)) hits.push(`${file}:${i + 1} ${label}`)
+      }
+    })
+  }
+  check('No forbidden phrase in UI copy', hits.length === 0, hits.slice(0, 4).join('; '))
+
+  // The live chrome must not be able to render a year it was shipped with.
+  const control = readFileSync(
+    join(ROOT, 'frontend/src/components/map/LiveControl.jsx'),
+    'utf8',
+  )
+    .replace(/\/\*[\s\S]*?\*\//g, '')
+    .replace(/^\s*\/\/.*$/gm, '')
+  check(
+    'The Live control holds no literal year',
+    !/['"`][^'"`]*\b20\d\d\b[^'"`]*['"`]/.test(control),
+  )
+
+  check(
+    'The four display statuses are the only status words',
+    (() => {
+      const text = readFileSync(join(ROOT, 'backend/app/taxonomy.py'), 'utf8')
+      return ['Needs attention', 'Watch', 'Normal', 'Not sure'].every((w) => text.includes(w))
+    })(),
+  )
+}
+
+// =====================================================================  9
+if (wanted('livepast')) {
+  group('9  Live / Past data and notifications')
+
+  const timeline = await get('/api/timeline')
+  const ranges = timeline.body?.ranges ?? []
+  check(
+    'Timeline lists only periods that hold data',
+    timeline.ok && ranges.length > 0 && ranges.every((r) => r.detections > 0),
+    `${ranges.length} ranges`,
+  )
+  const archive = ranges.find((r) => r.kind === 'archive')
+  check(
+    'Archive ranges carry a real human label',
+    Boolean(archive) && /\d/.test(archive.label) && !/undefined|NaN/.test(archive.label),
+    archive?.label,
+  )
+
+  const live = await get(`/api/map?bbox=${BBOX}&days=1&mode=auto`)
+  check(
+    'Live resolves to a live-surface state',
+    live.ok &&
+      live.body.provenance.surface === 'live' &&
+      ['fresh', 'empty', 'delayed', 'unavailable'].includes(live.body.provenance.state),
+    `${live.body?.provenance?.state}`,
+  )
+  check(
+    'Live states the near-real-time caveat',
+    /hours after the satellite pass/i.test(live.body?.provenance?.feed?.latency_note ?? ''),
+  )
+  check(
+    'Observation time and retrieval time are separate fields',
+    live.ok &&
+      'observed_at' in live.body.provenance.feed &&
+      'retrieved_at' in live.body.provenance.feed,
+  )
+
+  if (archive) {
+    const rangeQuery = encodeURIComponent(archive.id)
+    const past = await get(`/api/map?bbox=${BBOX}&range=${rangeQuery}`)
+    check(
+      'Past data resolves to replay on the past surface',
+      past.ok &&
+        past.body.provenance.state === 'replay' &&
+        past.body.provenance.surface === 'past',
+      `${past.body?.provenance?.state}/${past.body?.provenance?.surface}`,
+    )
+    check('Past data is never flagged live', past.ok && past.body.provenance.is_live === false)
+    check('Past data suppresses alerts', past.ok && past.body.provenance.alerts_suppressed === true)
+    check(
+      'Past data reports the range it is showing',
+      Boolean(past.body?.provenance?.range?.label),
+      past.body?.provenance?.range?.label,
+    )
+
+    const before = await get('/api/notifications')
+    const replay = await get(`/api/map?bbox=${BBOX}&range=${rangeQuery}`)
+    const after = await get('/api/notifications')
+    check(
+      'A replay writes no notifications',
+      replay.body?.notifications?.suppressed === true &&
+        after.body.counts.open === before.body.counts.open,
+      `open ${before.body?.counts?.open} -> ${after.body?.counts?.open}`,
+    )
+    check(
+      'A replay still previews what would have fired',
+      Array.isArray(replay.body?.notifications?.preview),
+      `${replay.body?.notifications?.preview?.length ?? 0} previewed`,
+    )
+  }
+
+  const bad = await get('/api/map?range=1999-01-01:1999-01-05')
+  check('A range we do not hold is refused, not faked', bad.status === 404, `HTTP ${bad.status}`)
+
+  const policy = await get('/api/notifications/policy')
+  check(
+    'Notification policy is published with a version',
+    policy.ok && Boolean(policy.body.policy_version),
+    policy.body?.policy_version,
+  )
+  check(
+    'Policy names the three statuses that never notify',
+    policy.ok &&
+      ['normal', 'watch', 'not_sure'].every((s) => policy.body.never_notifies_for.includes(s)),
+  )
+
+  const drill = await postPath('/api/notifications/test')
+  check(
+    'A test alert is labelled TEST',
+    drill.ok &&
+      drill.body?.notification?.is_test === true &&
+      /TEST/.test(drill.body.notification.title),
+  )
+
+  const stored = await get('/api/notifications?include_resolved=true')
+  const overclaims = (stored.body?.items ?? []).filter((i) =>
+    /\b(confirmed|definitely|certain|guaranteed)\b/i.test(`${i.title} ${i.body}`),
+  )
+  check(
+    'No stored notification claims a fire is confirmed',
+    overclaims.length === 0,
+    overclaims.slice(0, 3).map((i) => i.title).join('; '),
+  )
+
+  const changes = await get('/api/changes')
+  check(
+    'Changes endpoint answers with a server time',
+    changes.ok && Boolean(changes.body.server_time),
+    `${changes.ms} ms`,
+  )
+}
+
+// ====================================================================  10
+if (wanted('gis')) {
+  group('10 GIS export')
+
+  for (const layer of ['detections', 'persistent_sources', 'facilities', 'notifications']) {
+    const res = await get(`/api/export/geojson/${layer}?mode=demo&days=1`)
+    check(
+      `GeoJSON layer "${layer}" is a FeatureCollection`,
+      res.ok && res.body?.type === 'FeatureCollection',
+      `${res.body?.features?.length ?? 0} features`,
+    )
+  }
+
+  const response = await fetch(`${API}/api/export/gpkg?mode=demo&days=1`).catch(() => null)
+  if (!response) {
+    check('GeoPackage downloads', false, 'request failed')
+  } else {
+    const buffer = Buffer.from(await response.arrayBuffer())
+    const file = join(tmpdir(), `firetrace-smoke-${Date.now()}.gpkg`)
+    writeFileSync(file, buffer)
+
+    // Reading it back is the check. A file that cannot be opened is not an
+    // export, so the gate shells into Python and actually parses it.
+    const report = await new Promise((resolve) => {
+      const probe = spawn(
+        venvPython(),
+        [
+          '-c',
+          'import sys,json;sys.path.insert(0,"backend");from pathlib import Path;'
+            + 'from app.services import gis;print(json.dumps(gis.read_back(Path(sys.argv[1]))))',
+          file,
+        ],
+        { cwd: ROOT, encoding: 'utf8' },
+      )
+      let out = ''
+      probe.stdout.on('data', (d) => (out += d))
+      probe.on('close', () => {
+        try {
+          resolve(JSON.parse(out))
+        } catch {
+          resolve(null)
+        }
+      })
+      probe.on('error', () => resolve(null))
+    })
+    rmSync(file, { force: true })
+
+    check(
+      'GeoPackage downloads',
+      response.status === 200 && buffer.length > 0,
+      `${(buffer.length / 1024).toFixed(0)} KB`,
+    )
+    check('GeoPackage identifies itself as one', report?.is_geopackage === true)
+    check(
+      'GeoPackage holds all four layers',
+      report != null && Object.keys(report.layers ?? {}).length === 4,
+      Object.keys(report?.layers ?? {}).join(', '),
+    )
+    check(
+      'GeoPackage geometry is WGS 84 with valid headers',
+      report != null &&
+        Object.values(report.layers).every((l) => l.srs_id === 4326) &&
+        report.layers.detections?.geometry_header_valid === true,
+    )
   }
 }
 

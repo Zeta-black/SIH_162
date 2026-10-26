@@ -169,7 +169,10 @@ class TestGracefulDegradation:
 
         prov = body["provenance"]
         assert prov["is_live"] is False
-        assert prov["state"] in ("offline", "unavailable")
+        # Pass 2 renamed the internal states to say what they are. "offline"
+        # became "delayed": real last-good data with its age on screen.
+        assert prov["state"] in ("delayed", "unavailable")
+        assert prov["surface"] == "live", "a delayed feed is still the Live surface"
         assert body["counts"]["sites"] > 0, "a rejected key must not empty the map"
 
     def test_dead_network_falls_back_to_the_archive(self, monkeypatch):
@@ -203,9 +206,13 @@ class TestGracefulDegradation:
             body = c.get("/api/map", params={"mode": "auto", "days": 1}).json()
 
         prov = body["provenance"]
-        assert prov["state"] == "offline"
+        assert prov["state"] == "delayed"
         assert prov["is_live"] is False
-        assert "saved" in prov["label"].lower()
+        # The honesty moved from the label to the age: the chip reads "Live" and
+        # the line underneath reads "Feed delayed - last update N h ago", so the
+        # age must be present and real.
+        assert prov["feed"]["observed_age_minutes"] is not None
+        assert prov["cache"] is not None, "a delayed feed must say what it is showing"
 
     def test_health_stays_serviceable_when_the_feed_is_down(self, monkeypatch):
         def dead(*args, **kwargs):

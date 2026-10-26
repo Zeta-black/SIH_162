@@ -314,7 +314,10 @@ class TestMapEndpoint:
         prov = body["provenance"]
         assert prov["state"] == "replay"
         assert prov["is_live"] is False
-        assert "live" not in prov["label"].lower()
+        # Pass 2 replaced the free-text label with an explicit surface, so a
+        # replay cannot land under the Live segment by accident.
+        assert prov["surface"] == "past"
+        assert prov["alerts_suppressed"] is True
 
     def test_observation_and_retrieval_times_are_separate(self, client):
         body = client.get("/api/map", params={"mode": "demo", "days": 1}).json()

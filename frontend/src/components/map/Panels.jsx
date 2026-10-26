@@ -73,13 +73,24 @@ export function SearchBar({ value, onChange, results, onPick, busy, loading }) {
     <div style={{ position: 'relative' }} ref={wrapRef}>
       <div className="fc-search">
         <IconSearch width={16} height={16} />
+        {/* The full ARIA 1.2 combobox pattern, not just aria-expanded.
+            axe flagged aria-expanded on a bare search input as a critical
+            aria-allowed-attr violation: the attribute is only meaningful once
+            the element actually claims to be a combobox, and a screen reader
+            has no way to announce the suggestion list without the role,
+            aria-autocomplete and aria-activedescendant. */}
         <input
           type="search"
+          role="combobox"
           value={value}
           placeholder="Search a facility or company"
           aria-label="Search a mapped industrial facility or company"
           aria-expanded={show}
           aria-controls={listId}
+          aria-autocomplete="list"
+          aria-activedescendant={
+            show && cursor >= 0 && items[cursor] ? `${listId}-opt-${cursor}` : undefined
+          }
           autoComplete="off"
           onChange={(event) => {
             onChange(event.target.value)
@@ -114,6 +125,7 @@ export function SearchBar({ value, onChange, results, onPick, busy, loading }) {
             items.map((hit, index) => (
               <button
                 key={`${hit.kind}-${hit.id}`}
+                id={`${listId}-opt-${index}`}
                 type="button"
                 className="fc-result"
                 role="option"

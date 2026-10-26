@@ -41,7 +41,7 @@ function SourceCard({ source }) {
         )}
         {source.polygons_in_snapshot != null && (
           <Row label="Polygons">
-            <span className="num">{int(source.polygons_in_snapshot)}</span> in the offline snapshot
+            <span className="num">{int(source.polygons_in_snapshot)}</span> in the saved archive
           </Row>
         )}
         {source.observation_period?.from && (
@@ -217,7 +217,7 @@ export default function DataSources() {
         </Group>
 
         {snapshot && (
-          <Module title="Offline snapshot" note={`captured ${String(snapshot.captured_at).slice(0, 10)}`}>
+          <Module title="Saved archive" note={`captured ${String(snapshot.captured_at).slice(0, 10)}`}>
             <Module title={snapshot.name}>
               <div className="metrics metrics-3" style={{ marginBottom: 14 }}>
                 <Metric label="Detections" value={int(snapshot.events)} sub="real FIRMS records" />

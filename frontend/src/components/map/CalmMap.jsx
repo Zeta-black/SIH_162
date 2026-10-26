@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import L from 'leaflet'
-import INDIA_OUTLINE from '../../data/india-outline.json'
 
 /**
  * The map.
@@ -178,15 +177,28 @@ export default function CalmMap({
 
     map.fitBounds(INDIA_BOUNDS, { padding: [12, 12] })
 
-    // The outline goes on first so it sits underneath the tiles and becomes the
-    // visible floor if they never arrive.
-    outlineLayerRef.current = L.geoJSON(INDIA_OUTLINE, {
-      interactive: false,
-      style: (feature) =>
-        feature.properties.kind === 'country'
-          ? { className: 'fc-outline-country' }
-          : { className: 'fc-outline-state' },
-    }).addTo(map)
+    /* The India outline is a fallback, not first paint.
+     *
+     * Imported statically it was 69 KB of JSON parsed as a JS module in the
+     * critical path, and first contentful paint measured 5.15 s. Loading it
+     * after the map exists costs nothing visually — the tiles are still
+     * arriving — and takes it off the blocking path. */
+    import('../../data/india-outline.json')
+      .then(({ default: outline }) => {
+        if (!mapRef.current) return
+        outlineLayerRef.current = L.geoJSON(outline, {
+          interactive: false,
+          style: (feature) =>
+            feature.properties.kind === 'country'
+              ? { className: 'fc-outline-country' }
+              : { className: 'fc-outline-state' },
+        }).addTo(map)
+        outlineLayerRef.current.bringToBack()
+      })
+      .catch(() => {
+        // Without the outline a tile failure shows an empty ground. The warning
+        // note still appears, so the screen is never silently wrong.
+      })
 
     L.control.zoom({ position: 'bottomright' }).addTo(map)
     markerLayerRef.current = L.layerGroup().addTo(map)
