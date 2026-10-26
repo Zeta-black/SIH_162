@@ -1,0 +1,375 @@
+/* The detail card, the evidence drawer and the mobile bottom sheet.
+ *
+ * Split out of app.css only for length. Same token system, same rules.
+ */
+
+.fc-sitecard {
+  top: var(--sp-4);
+  right: var(--sp-4);
+  width: 364px;
+  max-height: calc(100vh - var(--sp-4) * 2);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  animation: fc-card-in var(--dur-base) var(--ease-out);
+}
+@keyframes fc-card-in {
+  from { opacity: 0; transform: translateX(10px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+
+/* The drag handle is a sheet affordance only, so it is hidden on desktop. */
+.fc-sheet-handle { display: none; }
+
+.fc-card-head {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--sp-2);
+  padding: var(--sp-4) var(--sp-4) var(--sp-3);
+}
+.fc-card-headtext { flex: 1; min-width: 0; }
+.fc-card-title {
+  font-size: var(--t-16);
+  font-weight: var(--w-medium);
+  line-height: 1.3;
+  letter-spacing: -0.01em;
+  margin: 0;
+  overflow-wrap: break-word;
+}
+.fc-card-sub { font-size: var(--t-12); color: var(--ink-3); margin: 3px 0 0; }
+
+.fc-card-body { padding: 0 var(--sp-4) var(--sp-4); overflow-y: auto; }
+
+.fc-card-chips { display: flex; flex-wrap: wrap; gap: var(--sp-2); }
+
+.fc-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 10px;
+  border-radius: var(--r-pill);
+  font-size: var(--t-12);
+  font-weight: var(--w-medium);
+  border: 1px solid transparent;
+  white-space: nowrap;
+}
+.fc-status-needs_attention {
+  background: var(--s-attn-wash);
+  color: var(--s-attn-ink);
+  border-color: var(--s-attn-line);
+}
+.fc-status-watch {
+  background: var(--s-watch-wash);
+  color: var(--s-watch-ink);
+  border-color: var(--s-watch-line);
+}
+.fc-status-normal {
+  background: var(--s-normal-wash);
+  color: var(--s-normal-ink);
+  border-color: var(--s-normal-line);
+}
+.fc-status-not_sure {
+  background: var(--s-unsure-wash);
+  color: var(--s-unsure-ink);
+  border-color: var(--s-unsure-line);
+}
+
+/* Persistent-source / new-heat badge. Neutral on purpose: it states a fact
+   about history, not an urgency, and urgency owns the colour. */
+.fc-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 9px;
+  border-radius: var(--r-pill);
+  font-size: var(--t-11);
+  font-weight: var(--w-medium);
+  background: var(--surface-sunk);
+  border: 1px solid var(--border);
+  color: var(--ink-2);
+  white-space: nowrap;
+}
+
+.fc-verdict {
+  font-size: var(--t-16);
+  line-height: 1.45;
+  color: var(--ink);
+  margin: var(--sp-3) 0 var(--sp-2);
+  letter-spacing: -0.005em;
+}
+
+.fc-classline {
+  font-size: var(--t-12);
+  color: var(--ink-3);
+  margin: 0 0 var(--sp-3);
+  line-height: 1.5;
+}
+.fc-classline b { color: var(--ink-2); font-weight: var(--w-medium); }
+
+.fc-why {
+  list-style: none;
+  margin: 0 0 var(--sp-4);
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+}
+.fc-why li {
+  display: flex;
+  gap: var(--sp-2);
+  font-size: var(--t-12);
+  color: var(--ink-2);
+  line-height: 1.5;
+}
+.fc-why svg { flex: 0 0 auto; margin-top: 2px; color: var(--ink-3); }
+
+.fc-band { margin-bottom: var(--sp-4); }
+.fc-band-label {
+  font-size: var(--t-11);
+  color: var(--ink-3);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  font-weight: var(--w-medium);
+  margin: 0 0 6px;
+}
+.fc-band-track {
+  position: relative;
+  height: 26px;
+  background: var(--surface-sunk);
+  border-radius: 6px;
+  border: 1px solid var(--border);
+  overflow: hidden;
+}
+/* The measured "usual range". Drawn only where a baseline actually exists. */
+.fc-band-usual {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  background: color-mix(in srgb, var(--s-normal) 20%, transparent);
+  border-left: 1px solid color-mix(in srgb, var(--s-normal) 48%, transparent);
+  border-right: 1px solid color-mix(in srgb, var(--s-normal) 48%, transparent);
+}
+.fc-band-marker {
+  position: absolute;
+  top: 3px;
+  bottom: 3px;
+  width: 4px;
+  border-radius: 2px;
+}
+.fc-band-note {
+  font-size: var(--t-11);
+  color: var(--ink-3);
+  margin: 6px 0 0;
+  line-height: 1.5;
+}
+.fc-band-note b { color: var(--ink-2); font-weight: var(--w-medium); }
+
+.fc-unsure {
+  background: var(--s-unsure-wash);
+  border: 1px solid var(--border);
+  border-radius: var(--r-sm);
+  padding: var(--sp-2) var(--sp-3);
+  font-size: var(--t-12);
+  color: var(--ink-2);
+  line-height: 1.5;
+  margin: 0;
+}
+.fc-unsure b { font-weight: var(--w-medium); color: var(--ink); }
+
+.fc-card-actions {
+  display: flex;
+  gap: var(--sp-2);
+  padding: var(--sp-3) var(--sp-4);
+  border-top: 1px solid var(--border);
+  background: var(--surface-muted);
+  position: relative;
+}
+.fc-card-actions .fc-btn { flex: 1; }
+.fc-copy {
+  flex: 0 0 auto;
+  width: var(--control-h-lg);
+  border: 1px solid var(--border-strong);
+  background: var(--surface);
+}
+
+/* ---- evidence drawer -------------------------------------------------- */
+.fc-drawer {
+  position: fixed;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: min(500px, 100vw);
+  background: var(--surface);
+  border-left: 1px solid var(--border);
+  box-shadow: var(--shadow-raised);
+  z-index: var(--z-drawer);
+  display: flex;
+  flex-direction: column;
+  animation: fc-drawer-in var(--dur-base) var(--ease-out);
+}
+@keyframes fc-drawer-in {
+  from { transform: translateX(18px); opacity: 0; }
+  to { transform: translateX(0); opacity: 1; }
+}
+.fc-drawer-head {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  padding: var(--sp-4);
+  border-bottom: 1px solid var(--border);
+}
+.fc-drawer-title {
+  font-size: var(--t-16);
+  font-weight: var(--w-medium);
+  flex: 1;
+  letter-spacing: -0.01em;
+}
+.fc-drawer-body { padding: var(--sp-4); overflow-y: auto; flex: 1; }
+
+.fc-group { margin-bottom: var(--sp-5); }
+.fc-group:last-child { margin-bottom: 0; }
+.fc-group-title {
+  font-size: var(--t-11);
+  font-weight: var(--w-medium);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--ink-3);
+  margin: 0 0 var(--sp-2);
+  padding-bottom: 6px;
+  border-bottom: 1px solid var(--border);
+}
+.fc-ev {
+  display: flex;
+  gap: var(--sp-2);
+  padding: 7px 0;
+  font-size: var(--t-12);
+  line-height: 1.5;
+  color: var(--ink-2);
+  align-items: flex-start;
+}
+.fc-ev svg { flex: 0 0 auto; margin-top: 1px; }
+.fc-ev-supporting svg { color: var(--s-normal); }
+.fc-ev-missing svg { color: var(--s-watch); }
+.fc-ev-contradicting svg { color: var(--s-attn); }
+
+.fc-fold {
+  border: 1px solid var(--border);
+  border-radius: var(--r-sm);
+  overflow: hidden;
+  margin-top: var(--sp-4);
+}
+.fc-fold > summary {
+  padding: var(--sp-2) var(--sp-3);
+  cursor: pointer;
+  font-size: var(--t-12);
+  font-weight: var(--w-medium);
+  color: var(--ink-2);
+  background: var(--surface-muted);
+  list-style: none;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 40px;
+}
+.fc-fold > summary::-webkit-details-marker { display: none; }
+.fc-fold > summary::after {
+  content: "+";
+  margin-left: auto;
+  color: var(--ink-3);
+  font-size: var(--t-16);
+}
+.fc-fold[open] > summary::after { content: "–"; }
+.fc-fold-body { padding: var(--sp-3); border-top: 1px solid var(--border); }
+
+/* ---- analyst labelling popover ---------------------------------------- */
+.fc-labelpop {
+  position: absolute;
+  bottom: calc(100% + 8px);
+  right: var(--sp-4);
+  left: var(--sp-4);
+  padding: var(--sp-3);
+  z-index: var(--z-search);
+}
+.fc-labelopt {
+  display: block;
+  width: 100%;
+  border: 0;
+  background: transparent;
+  text-align: left;
+  padding: 7px var(--sp-2);
+  border-radius: 6px;
+  font-size: 13px;
+  color: var(--ink-2);
+  cursor: pointer;
+  min-height: 34px;
+}
+.fc-labelopt:hover { background: var(--surface-muted); color: var(--ink); }
+.fc-labelnote {
+  width: 100%;
+  margin-top: var(--sp-2);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--surface);
+  color: var(--ink);
+  padding: var(--sp-2);
+  font-size: var(--t-12);
+  font-family: var(--font);
+  resize: vertical;
+  min-height: 52px;
+}
+
+/* ---- mobile bottom sheet ---------------------------------------------- */
+@media (max-width: 760px) {
+  .fc-sitecard {
+    top: auto;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    width: auto;
+    border-radius: var(--r-lg) var(--r-lg) 0 0;
+    border-bottom: 0;
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+    animation: fc-sheet-in var(--dur-slow) var(--ease-out);
+    transition: max-height var(--dur-slow) var(--ease-out);
+  }
+  @keyframes fc-sheet-in {
+    from { transform: translateY(24px); opacity: 0; }
+    to { transform: translateY(0); opacity: 1; }
+  }
+
+  /* Three snap points. Peek shows title and status; half is the default and
+     fits the verdict; full scrolls the evidence. Snap points rather than free
+     dragging, because a sheet that lands between states is worse than one that
+     snaps, and free drag needs momentum physics to feel right. */
+  .fc-snap-peek { max-height: 140px; }
+  .fc-snap-half { max-height: 58vh; }
+  .fc-snap-full { max-height: 92vh; }
+
+  .fc-sheet-handle {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    height: 26px;
+    border: 0;
+    background: transparent;
+    cursor: grab;
+    flex: 0 0 auto;
+    touch-action: none;
+  }
+  .fc-sheet-handle span {
+    width: 36px;
+    height: 4px;
+    border-radius: 2px;
+    background: var(--border-strong);
+  }
+
+  .fc-card-head { padding-top: var(--sp-2); }
+  .fc-card-actions {
+    padding-bottom: calc(var(--sp-3) + env(safe-area-inset-bottom, 0px));
+  }
+  .fc-card-actions .fc-btn { min-height: var(--touch-min); }
+  .fc-copy { min-height: var(--touch-min); }
+
+  .fc-drawer { width: 100vw; }
+}

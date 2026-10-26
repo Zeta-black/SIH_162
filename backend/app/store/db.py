@@ -217,6 +217,35 @@ class EventStore:
         except sqlite3.Error:
             return 0
 
+    def newest_event_date(self) -> str | None:
+        """Most recent acquisition date held, for the Past-data picker."""
+        if not self.ready:
+            return None
+        try:
+            with self.connect() as conn:
+                row = conn.execute(
+                    "SELECT MAX(acquisition_date) FROM hotspot_events"
+                ).fetchone()
+            return row[0] if row and row[0] else None
+        except sqlite3.Error:
+            return None
+
+    def count_between(self, start: str, end: str) -> int:
+        """Detections in an inclusive date range. Used to prove a range is real
+        before the picker offers it."""
+        if not self.ready:
+            return 0
+        try:
+            with self.connect() as conn:
+                row = conn.execute(
+                    "SELECT COUNT(*) FROM hotspot_events "
+                    "WHERE acquisition_date >= ? AND acquisition_date <= ?",
+                    (start, end),
+                ).fetchone()
+            return int(row[0]) if row else 0
+        except sqlite3.Error:
+            return 0
+
     def date_span(self) -> tuple[str | None, str | None]:
         if not self.ready:
             return None, None

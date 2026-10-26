@@ -78,6 +78,9 @@ class HistoryIndex:
 
         # --- recurrence at the same source ---------------------------------
         prior_dates: list[date] = []
+        # Radiative power of the earlier detections here, so "usual range for
+        # this location" can be a measured band rather than an assertion.
+        prior_frp: list[float] = []
         recurrence_count = 0
         recent_count = 0
         for point, _dist in self.grid.within(event.latitude, event.longitude, radius_km):
@@ -91,6 +94,8 @@ class HistoryIndex:
                 continue
             recurrence_count += 1
             prior_dates.append(d)
+            if other.frp_mw is not None:
+                prior_frp.append(other.frp_mw)
             if d >= recent_start:
                 recent_count += 1
 
@@ -129,4 +134,7 @@ class HistoryIndex:
             window_days=window_days,
             radius_km=radius_km,
             history_available=True,
+            prior_frp_min=round(min(prior_frp), 2) if prior_frp else None,
+            prior_frp_max=round(max(prior_frp), 2) if prior_frp else None,
+            prior_frp_count=len(prior_frp),
         )

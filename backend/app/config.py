@@ -31,6 +31,25 @@ class Settings(BaseSettings):
     # ---------------------------------------------------------------- general
     app_name: str = "FIRETRACE"
     app_version: str = "1.0.0"
+    # --- Notifications ----------------------------------------------------
+    # See docs/NOTIFICATION_POLICY.md. These exist so alert fatigue is a tuned
+    # parameter rather than an accident.
+    notify_enabled: bool = Field(default=True, alias="NOTIFY_ENABLED")
+    notify_cooldown_hours: float = Field(default=6.0, alias="NOTIFY_COOLDOWN_HOURS")
+    notify_feed_delay_hours: float = Field(default=6.0, alias="NOTIFY_FEED_DELAY_HOURS")
+    notify_system_daily_cap: int = Field(default=6, alias="NOTIFY_SYSTEM_DAILY_CAP")
+    # Priority margin a site must move before it may notify again, so a value
+    # sitting on a threshold does not flap on every poll.
+    notify_hysteresis: float = Field(default=0.05, alias="NOTIFY_HYSTERESIS")
+    # Abnormality (0-100) above which a persistent source is called unusual.
+    notify_abnormal_threshold: int = Field(default=70, alias="NOTIFY_ABNORMAL_THRESHOLD")
+
+    # Outbound webhook. Disabled when empty; no SMS or email is built in.
+    webhook_url: str = Field(default="", alias="FIRETRACE_WEBHOOK_URL")
+    webhook_timeout_seconds: float = Field(default=8.0, alias="FIRETRACE_WEBHOOK_TIMEOUT")
+    webhook_retries: int = Field(default=2, alias="FIRETRACE_WEBHOOK_RETRIES")
+    webhook_backoff_seconds: float = Field(default=0.75, alias="FIRETRACE_WEBHOOK_BACKOFF")
+
     log_level: str = "INFO"
     cors_origins: str = "http://localhost:5173,http://127.0.0.1:5173"
 

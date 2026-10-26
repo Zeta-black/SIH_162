@@ -9,10 +9,10 @@ from __future__ import annotations
 import csv
 import io
 import logging
-from datetime import date, datetime, timezone
+from datetime import date, datetime, timedelta, timezone
 
 from fastapi import APIRouter, HTTPException, Query, Response
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from app.config import settings
 from app.schemas import (
@@ -30,6 +30,9 @@ from app.services import firms as firms_service
 from app.services import landcover as landcover_service
 from app.services import osm as osm_service
 from app.services import pipeline, replay as replay_service, snapshot as snapshot_service
+from app.services import gis as gis_service
+from app.services import notifications as notify_service
+from app.services import timeline as timeline_service
 from app.services import verdict as verdict_service
 from app.services.classifier import DISCLAIMER, get_classifier
 from app.services.geo import GridPoint, SpatialGrid, bbox_around, haversine_km, parse_bbox
@@ -420,59 +423,100 @@ class IncidentAction(BaseModel):
 # duplication alone was ~320 KB of the old 1.46 MB /api/hotspots payload).
 
 
-def _provenance(requested_mode: str, status, n_events: int) -> dict:
+def _provenance(
+    requested_mode: str,
+    status,
+    events: list,
+    range_dates=None,
+) -> dict:
     """Name the data state. Never ambiguous, never flattering.
 
-    Five states, matching what the UI chip can render:
-      live        — fetched from NASA now, detections present
-      live_empty  — fetched from NASA now, genuinely nothing in the window
-      offline     — a live attempt failed, so saved data is on screen
-      replay      — the frozen historical archive, chosen deliberately
-      unavailable — nothing to show at all
+    Five internal states, unchanged from Pass 1 in meaning, renamed in Pass 2 so
+    the names say what they are rather than what the chip used to read:
+
+      fresh       - fetched from NASA in this request, detections present
+      empty       - fetched from NASA in this request, genuinely nothing there
+      delayed     - a live attempt failed; real last-good data is on screen
+      replay      - a deliberately chosen historical range
+      simulated   - a constructed scenario (never produced here; reserved)
+      unavailable - nothing to show at all
+
+    The user-facing wording collapses the first three under one word, "Live",
+    and puts the honesty in the freshness line underneath instead: the label is
+    reassuring, the age is always real. What is forbidden is the reverse — a
+    stale screen that *looks* fresh. So `feed.observed_age_minutes` is computed
+    from the newest detection on screen and the UI is required to render it.
     """
     if status is None:
         return {
             "state": "unavailable",
-            "label": "No data",
+            "surface": "live",
             "detail": "The analysis returned no status block.",
             "is_live": False,
+            "feed": timeline_service.feed_freshness([], "unknown", None),
         }
 
     resolved = status.mode
     firms = status.firms_status
+    n_events = len(events)
 
-    if resolved == "live":
+    if range_dates is not None:
+        state = "replay"
+    elif resolved == "live":
         if firms == "ok" and n_events > 0:
-            state, label = "live", "Live · NASA FIRMS"
+            state = "fresh"
         elif firms == "no_data":
-            state, label = "live_empty", "Live · no detections in window"
+            state = "empty"
         else:
-            state, label = "unavailable", "Live feed unavailable"
+            state = "unavailable"
     elif resolved == "cached":
-        # Real NASA data, but not fetched now. Never shown as live.
-        state, label = "offline", "Offline · showing saved data"
+        state = "delayed"
+    elif requested_mode == "demo":
+        state = "replay"
+    elif firms in ("unavailable", "not_configured", "cached") or not status.firms_products_used:
+        state = "delayed"
     else:
-        if requested_mode == "demo":
-            state, label = "replay", "Replay · real historical detections"
-        elif firms in ("unavailable", "not_configured", "cached") or not status.firms_products_used:
-            state, label = "offline", "Offline · showing saved data"
-        else:
-            state, label = "replay", "Replay · real historical detections"
+        state = "replay"
 
-    return {
+    feed = timeline_service.feed_freshness(
+        events, resolved, status.last_updated if status else None
+    )
+
+    # A feed that answered but whose newest observation is older than the
+    # staleness bar is reported as delayed even though the request succeeded.
+    # Otherwise a technically-successful fetch of nothing new would read as
+    # fresh for as long as FIRMS keeps answering.
+    if state == "fresh" and feed["stale"]:
+        state = "delayed"
+
+    out = {
         "state": state,
-        "label": label,
+        # Which segment of the Live | Past data control is active. The UI never
+        # derives this from the state; a replay must not be able to land under
+        # the Live label by accident.
+        "surface": "past" if state == "replay" else "live",
         "detail": status.firms_message,
-        "is_live": state == "live",
+        "is_live": state == "fresh",
         "source": "NASA FIRMS",
         "products": status.firms_products_used,
         "geographic_context": status.osm_message,
-        # Observation time and retrieval time are different facts and are kept
-        # apart everywhere. `retrieved_at` is when FIRETRACE asked; the per-site
-        # `observed_at` is when the satellite saw it.
         "retrieved_at": status.last_updated.isoformat() if status.last_updated else None,
         "archive_note": status.snapshot_note,
+        "feed": feed,
+        "cache": timeline_service.cached_feed_note(),
+        # True only in replay. Every alert path checks this before sending.
+        "alerts_suppressed": state in ("replay", "simulated"),
     }
+
+    if range_dates is not None:
+        start, end = range_dates
+        out["range"] = {
+            "from": start.isoformat(),
+            "to": end.isoformat(),
+            "label": timeline_service.human_range(start, end),
+        }
+
+    return out
 
 
 # Facility "names" that are really category labels, so a site titled with one of
@@ -550,6 +594,23 @@ def _site(e) -> dict:
         "distinct_passes": e.distinct_passes,
         "distinct_days": e.distinct_days,
         "history_available": e.history_available,
+        # Only published where priority.abnormality actually assessed a
+        # baseline. A range from one prior reading is not a "usual range", and
+        # the card draws no band when this is absent.
+        "baseline_range": (
+            {
+                "min": e.baseline_frp_min,
+                "max": e.baseline_frp_max,
+                "readings": e.baseline_frp_count,
+            }
+            if (
+                e.abnormality_status == "assessed"
+                and e.baseline_frp_min is not None
+                and e.baseline_frp_max is not None
+                and e.baseline_frp_count >= 2
+            )
+            else None
+        ),
         "persistent": e.persistent,
         "frp_max_mw": e.frp_max_mw,
         "frp_total_mw": e.frp_total_mw,
@@ -564,20 +625,61 @@ def _site(e) -> dict:
     }
 
 
+@router.get("/api/timeline", tags=["map"])
+def timeline() -> dict:
+    """Date ranges FIRETRACE actually holds, newest first.
+
+    The Past-data picker is built from this. Nothing is hard-coded, so the
+    picker cannot offer a period we do not have.
+    """
+    ranges = timeline_service.available_ranges()
+    return {
+        "ranges": ranges,
+        "count": len(ranges),
+        "min_run_days": timeline_service.MIN_RUN_DAYS,
+        "note": (
+            "Derived from the detections held in the archive and the local "
+            "store. A range is only listed when it contains real data."
+        ),
+    }
+
+
 @router.get("/api/map", tags=["map"])
 def map_view(
     bbox: str | None = Query(None),
     days: int = Query(settings.firms_default_day_range, ge=1, le=5),
     mode: str = Query("auto", pattern="^(auto|live|demo)$"),
+    range_id: str | None = Query(
+        None,
+        alias="range",
+        description="A date range id from /api/timeline. Forces Past-data mode.",
+    ),
     limit: int = Query(1000, ge=1, le=2000),
 ) -> dict:
     """Everything the main screen needs, in one request."""
+    # A requested range means Past data, which is served entirely from stored
+    # detections and must not touch the network.
+    range_dates = timeline_service.resolve_range(range_id)
+    if range_id and range_dates is None:
+        raise HTTPException(
+            status_code=404,
+            detail="That date range is not held. Call /api/timeline for what is available.",
+        )
+    if range_dates is not None:
+        mode = "demo"
+
     try:
         result = pipeline.run_analysis(bbox, days=days, mode=mode)
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
-    grouped = events_service.cluster(result.events)
+    events = result.events
+    if range_dates is not None:
+        start, end = range_dates
+        # result.events holds ClassifiedEvent; the observation is one level in.
+        events = [e for e in events if start <= e.event.acquisition_date <= end]
+
+    grouped = events_service.cluster(events)
     sites = [_site(e) for e in grouped]
 
     counts = {key: 0 for key in DISPLAY_STATUSES}
@@ -587,10 +689,25 @@ def map_view(
     # Triage order: needs attention first, then unresolved, then by priority.
     sites.sort(key=lambda s: (STATUS_RANK[s["status"]], -s["priority_score"]))
 
+    provenance = _provenance(mode, result.status, events, range_dates)
+
+    # Notifications are evaluated here, from the analysis the app already has,
+    # so they never cause an extra NASA request.
+    #
+    # Replay safety is enforced at this single call: with alerts_suppressed set
+    # the evaluator computes what *would* have fired and writes nothing, so no
+    # channel downstream can leak a real alert from a replay.
+    notifications = notify_service.evaluate(
+        sites,
+        suppress=bool(provenance.get("alerts_suppressed")),
+        feed=provenance.get("feed"),
+    )
+
     model = get_classifier().info()
     return {
-        "provenance": _provenance(mode, result.status, len(result.events)),
-        "counts": {**counts, "sites": len(sites), "detections": len(result.events)},
+        "provenance": provenance,
+        "notifications": notifications,
+        "counts": {**counts, "sites": len(sites), "detections": len(events)},
         "status_vocabulary": [
             {
                 "key": k,
@@ -605,6 +722,7 @@ def map_view(
             "observed_from": min((s["first_observed_at"] for s in sites), default=None),
             "observed_to": max((s["observed_at"] for s in sites), default=None),
         },
+        "ranges": timeline_service.available_ranges(),
         "model": {
             "model_version": model.model_version,
             "algorithm": model.algorithm,
@@ -686,6 +804,135 @@ def map_search(
 
     hits.sort(key=lambda h: (h["kind"] != "site", len(h["name"])))
     return {"query": q, "results": hits[:limit], "total_matches": len(hits)}
+
+
+# ---------------------------------------------------------------------------
+# Notifications
+# ---------------------------------------------------------------------------
+# The policy lives in docs/NOTIFICATION_POLICY.md and the mechanism in
+# services/notifications.py. These routes only expose it.
+
+
+class NotificationAction(BaseModel):
+    action: str = Field(pattern="^(seen|acknowledge|snooze|resolve)$")
+    hours: float = Field(default=6.0, ge=0.25, le=168)
+
+
+@router.get("/api/notifications", tags=["notifications"])
+def list_notifications(
+    limit: int = Query(50, ge=1, le=200),
+    include_resolved: bool = Query(False),
+) -> dict:
+    """The notification centre's contents, newest first."""
+    store = notify_service.get_store()
+    items = store.recent(limit=limit, include_resolved=include_resolved)
+    return {
+        "items": items,
+        "counts": store.counts(),
+        "policy": notify_service.policy_summary(),
+        "webhook_configured": bool(settings.webhook_url),
+    }
+
+
+@router.get("/api/notifications/policy", tags=["notifications"])
+def notification_policy() -> dict:
+    """What triggers an alert, and what deliberately does not."""
+    return notify_service.policy_summary()
+
+
+@router.post("/api/notifications/{notification_id}/action", tags=["notifications"])
+def notification_action(notification_id: str, body: NotificationAction) -> dict:
+    """Move one notification through its state machine."""
+    store = notify_service.get_store()
+    now = datetime.now(timezone.utc).isoformat()
+
+    if body.action == "seen":
+        ok = store.set_state(notification_id, "seen", seen_at=now)
+    elif body.action == "acknowledge":
+        ok = store.set_state(notification_id, "acknowledged", acknowledged_at=now)
+    elif body.action == "snooze":
+        until = (
+            datetime.now(timezone.utc) + timedelta(hours=body.hours)
+        ).isoformat()
+        ok = store.set_state(notification_id, "snoozed", snoozed_until=until)
+    else:
+        ok = store.set_state(notification_id, "resolved", resolved_at=now)
+
+    if not ok:
+        raise HTTPException(status_code=404, detail="No such notification.")
+    return {"ok": True, "id": notification_id, "state": body.action, "counts": store.counts()}
+
+
+@router.post("/api/notifications/test", tags=["notifications"])
+def send_test_notification() -> dict:
+    """Send a drill.
+
+    Always labelled TEST, in the message text and in the stored row, so a
+    recipient can never mistake a drill for a real alert.
+    """
+    now = datetime.now(timezone.utc)
+    notification = notify_service.Notification(
+        id=f"TEST:{int(now.timestamp())}",
+        reason_code=notify_service.NEEDS_ATTENTION,
+        severity="high",
+        title="TEST — this is a drill, not a real alert",
+        body=(
+            "Sent from FIRETRACE settings to check delivery. No thermal detection "
+            "is associated with this message."
+        ),
+        site_id=None,
+        site_name=None,
+        status=None,
+        created_at=now,
+        is_test=True,
+    )
+    store = notify_service.get_store()
+    store.insert(notification)
+
+    delivery = notify_service.deliver_webhook(notification.as_dict())
+    return {
+        "ok": True,
+        "notification": notification.as_dict(),
+        "webhook": delivery,
+        "counts": store.counts(),
+    }
+
+
+@router.get("/api/changes", tags=["notifications"])
+def changes(since: str | None = Query(None)) -> dict:
+    """Lightweight poll target for the UI.
+
+    Deliberately cheap: it reads notification counts and the cached analysis
+    stamp, and never triggers an upstream NASA request. The UI polls this every
+    45 s so new items arrive without a manual reload.
+    """
+    store = notify_service.get_store()
+    counts = store.counts()
+    items = store.recent(limit=20)
+
+    newer = items
+    if since:
+        try:
+            cutoff = datetime.fromisoformat(since)
+            if cutoff.tzinfo is None:
+                cutoff = cutoff.replace(tzinfo=timezone.utc)
+            newer = [
+                item
+                for item in items
+                if datetime.fromisoformat(item["created_at"]).replace(
+                    tzinfo=timezone.utc
+                )
+                > cutoff
+            ]
+        except ValueError:
+            newer = items
+
+    return {
+        "server_time": datetime.now(timezone.utc).isoformat(),
+        "counts": counts,
+        "new": newer,
+        "new_count": len(newer),
+    }
 
 
 @router.get("/api/incidents", tags=["incidents"])
@@ -1145,6 +1392,97 @@ class RefreshResponse(BaseModel):
     refreshed: bool
     message: str
     firms_key_status: dict
+
+
+# ---------------------------------------------------------------------------
+# GIS export (PS-162 R4)
+# ---------------------------------------------------------------------------
+def _gis_collections(bbox: str | None, days: int, mode: str, range_id: str | None) -> dict:
+    """Build every export layer from one analysis."""
+    range_dates = timeline_service.resolve_range(range_id)
+    if range_dates is not None:
+        mode = "demo"
+
+    result = pipeline.run_analysis(bbox, days=days, mode=mode)
+    events = result.events
+    if range_dates is not None:
+        start, end = range_dates
+        events = [e for e in events if start <= e.event.acquisition_date <= end]
+
+    sites = [_site(e) for e in events_service.cluster(events)]
+    notifications = notify_service.get_store().recent(limit=500, include_resolved=True)
+
+    return {
+        "detections": gis_service.detections_geojson(sites),
+        "persistent_sources": gis_service.persistent_geojson(sites),
+        "facilities": gis_service.facilities_geojson(result.facilities),
+        "notifications": gis_service.notifications_geojson(notifications),
+    }
+
+
+@router.get("/api/export/geojson/{layer}", tags=["export"])
+def export_layer_geojson(
+    layer: str,
+    bbox: str | None = Query(None),
+    days: int = Query(settings.firms_default_day_range, ge=1, le=5),
+    mode: str = Query("auto", pattern="^(auto|live|demo)$"),
+    range_id: str | None = Query(None, alias="range"),
+) -> Response:
+    """One GIS layer as GeoJSON, ready to drop into QGIS."""
+    if layer not in gis_service.LAYERS:
+        raise HTTPException(
+            status_code=404,
+            detail=f"Unknown layer. Available: {', '.join(gis_service.LAYERS)}.",
+        )
+    try:
+        collections = _gis_collections(bbox, days, mode, range_id)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+    import json as _json
+
+    return Response(
+        content=_json.dumps(collections[layer], indent=1),
+        media_type="application/geo+json",
+        headers={
+            "Content-Disposition": f'attachment; filename="firetrace_{layer}.geojson"'
+        },
+    )
+
+
+@router.get("/api/export/gpkg", tags=["export"])
+def export_geopackage(
+    bbox: str | None = Query(None),
+    days: int = Query(settings.firms_default_day_range, ge=1, le=5),
+    mode: str = Query("auto", pattern="^(auto|live|demo)$"),
+    range_id: str | None = Query(None, alias="range"),
+) -> Response:
+    """All four layers in one OGC GeoPackage, WGS 84.
+
+    One file an analyst can open in QGIS or ArcGIS with every layer already
+    styled by its own attributes. Written with sqlite3 rather than GDAL — see
+    services/gis.py for why — and validated by reading it back in the test suite.
+    """
+    try:
+        collections = _gis_collections(bbox, days, mode, range_id)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+    path = gis_service.build_geopackage(collections)
+    try:
+        payload = path.read_bytes()
+    finally:
+        path.unlink(missing_ok=True)
+
+    stamp = datetime.now(timezone.utc).strftime("%Y%m%d")
+    return Response(
+        content=payload,
+        media_type="application/geopackage+sqlite3",
+        headers={
+            "Content-Disposition": f'attachment; filename="firetrace_{stamp}.gpkg"',
+            "X-FIRETRACE-Layers": ",".join(collections),
+        },
+    )
 
 
 @router.post("/api/refresh", response_model=RefreshResponse, tags=["system"])

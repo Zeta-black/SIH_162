@@ -1,0 +1,244 @@
+/* FIRETRACE design tokens.
+ *
+ * One file, every value. Components reference tokens and never literals, so the
+ * dark theme is the same system with different numbers rather than a parallel
+ * stylesheet — and so a reviewer can see the whole palette in one place.
+ *
+ * Inter is bundled from node_modules (@fontsource-variable/inter), not a CDN.
+ * A font that arrives over the network is a font that is missing on a venue
+ * with no Wi-Fi, and the app has to look identical offline.
+ *
+ * See docs/DESIGN_SYSTEM.md for the reasoning behind each scale.
+ */
+
+:root {
+  /* ---------------------------------------------------------------- grey
+   * A 10-step ramp with a slight cool tint (hue 215). Warm greys fight the
+   * amber and red status colours; a cool ground lets them read as signal. */
+  --g-0: #ffffff;
+  --g-25: #fbfcfd;
+  --g-50: #f6f8fa;
+  --g-100: #eef1f5;
+  --g-200: #e2e6ec;
+  --g-300: #cdd4dd;
+  --g-400: #a6b0bd;
+  --g-500: #7a8694;
+  --g-600: #5a6472;
+  --g-700: #414a56;
+  --g-800: #2a313a;
+  --g-900: #171c22;
+
+  /* --------------------------------------------------------------- brand
+   * One accent, used for focus, the active control and links. Nothing else. */
+  --brand: #1a5fb4;
+  --brand-ink: #14487f;
+  --brand-wash: #eaf1fa;
+  --brand-ring: rgba(26, 95, 180, 0.28);
+
+  /* -------------------------------------------------------------- status
+   * Four statuses. Checked with a deuteranopia/protanopia simulator: red vs
+   * green is the weak pair, so every surface pairs these with a text label AND
+   * a distinct marker shape. Colour is never the only carrier. */
+  --s-attn: #c0362c;
+  --s-attn-ink: #96281f;
+  --s-attn-wash: #fdeeec;
+  --s-attn-line: #eec0ba;
+
+  --s-watch: #b7791f;
+  --s-watch-ink: #8a5a12;
+  --s-watch-wash: #fdf5e7;
+  --s-watch-line: #e8d4a8;
+
+  --s-normal: #2f855a;
+  --s-normal-ink: #1f6344;
+  --s-normal-wash: #ebf7f0;
+  --s-normal-line: #bfe0cd;
+
+  --s-unsure: #6b7280;
+  --s-unsure-ink: #555b64;
+  --s-unsure-wash: #f2f3f5;
+  --s-unsure-line: #cdd4dd;
+
+  /* ------------------------------------------------------------ surfaces */
+  --surface: var(--g-0);
+  --surface-raised: var(--g-0);
+  --surface-sunk: var(--g-100);
+  --surface-muted: var(--g-50);
+  --border: var(--g-200);
+  --border-strong: var(--g-300);
+
+  --ink: var(--g-900);
+  --ink-2: var(--g-700);
+  --ink-3: var(--g-500);
+  --ink-inverse: var(--g-0);
+
+  /* The ground the map tiles sit on before they load. */
+  --map-void: var(--g-100);
+
+  /* ----------------------------------------------------------------- type
+   * One family, two weights (regular 450 / medium 600 via the variable axis).
+   * A 6-step scale; numbers use tabular figures so columns of digits align and
+   * a ticking "4 min ago" does not jitter. */
+  --font: 'Inter Variable', 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI',
+    Roboto, 'Helvetica Neue', Arial, sans-serif;
+  --t-11: 11px;
+  --t-12: 12px;
+  --t-14: 14px;
+  --t-16: 16px;
+  --t-20: 20px;
+  --t-28: 28px;
+  --w-regular: 450;
+  --w-medium: 600;
+
+  /* --------------------------------------------------------------- space
+   * 4/8 scale. Nothing is allowed an off-grid margin. */
+  --sp-1: 4px;
+  --sp-2: 8px;
+  --sp-3: 12px;
+  --sp-4: 16px;
+  --sp-5: 24px;
+  --sp-6: 32px;
+  --sp-7: 48px;
+
+  /* --------------------------------------------------------------- shape */
+  --r-sm: 8px;
+  --r-md: 12px;
+  --r-lg: 16px;
+  --r-pill: 999px;
+
+  /* -------------------------------------------------------------- depth
+   * Two levels only: resting and raised. No glows. A third level is how
+   * interfaces start looking like a pile of cards. */
+  --shadow-rest: 0 1px 2px rgba(23, 28, 34, 0.05), 0 2px 8px rgba(23, 28, 34, 0.06);
+  --shadow-raised: 0 2px 4px rgba(23, 28, 34, 0.06), 0 12px 28px rgba(23, 28, 34, 0.12);
+
+  /* -------------------------------------------------------------- motion
+   * Short and consistent. Motion explains a state change; it never decorates. */
+  --ease: cubic-bezier(0.2, 0, 0.2, 1);
+  --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+  --dur-fast: 120ms;
+  --dur-base: 180ms;
+  --dur-slow: 320ms;
+
+  /* ---------------------------------------------------------------- misc */
+  --control-h: 36px;
+  --control-h-lg: 44px;
+  --touch-min: 44px;
+  --z-map: 0;
+  --z-panel: 500;
+  --z-search: 600;
+  --z-toast: 800;
+  --z-scrim: 900;
+  --z-drawer: 1000;
+  --z-palette: 1100;
+}
+
+/* ------------------------------------------------------------------ dark
+ * The same system, different numbers. Built from the identical token names so
+ * no component needs a dark-specific rule.
+ *
+ * Applies on an explicit [data-theme="dark"] and on the system preference
+ * unless the user has explicitly chosen light. */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']) {
+    --g-0: #10151a;
+    --g-25: #141a20;
+    --g-50: #171d24;
+    --g-100: #1c232b;
+    --g-200: #272f39;
+    --g-300: #37414e;
+    --g-400: #566273;
+    --g-500: #7d8898;
+    --g-600: #9aa4b2;
+    --g-700: #bcc4cf;
+    --g-800: #dde2e8;
+    --g-900: #f2f5f8;
+
+    --brand: #6ea8f0;
+    --brand-ink: #a9cbf7;
+    --brand-wash: #16263a;
+    --brand-ring: rgba(110, 168, 240, 0.32);
+
+    --s-attn: #ef7a6e;
+    --s-attn-ink: #f6a79e;
+    --s-attn-wash: #3a1d1a;
+    --s-attn-line: #5e2b25;
+
+    --s-watch: #e0ab53;
+    --s-watch-ink: #efc983;
+    --s-watch-wash: #352713;
+    --s-watch-line: #56401d;
+
+    --s-normal: #5bbd8a;
+    --s-normal-ink: #8fd4ae;
+    --s-normal-wash: #16301f;
+    --s-normal-line: #24482f;
+
+    --s-unsure: #8d97a5;
+    --s-unsure-ink: #aab3bf;
+    --s-unsure-wash: #1f262e;
+    --s-unsure-line: #37414e;
+
+    --surface: var(--g-50);
+    --surface-raised: var(--g-100);
+    --surface-sunk: var(--g-25);
+    --surface-muted: var(--g-100);
+    --border: var(--g-200);
+    --border-strong: var(--g-300);
+    --map-void: var(--g-25);
+
+    --shadow-rest: 0 1px 2px rgba(0, 0, 0, 0.4), 0 2px 8px rgba(0, 0, 0, 0.32);
+    --shadow-raised: 0 2px 4px rgba(0, 0, 0, 0.42), 0 12px 28px rgba(0, 0, 0, 0.46);
+  }
+}
+
+:root[data-theme='dark'] {
+  --g-0: #10151a;
+  --g-25: #141a20;
+  --g-50: #171d24;
+  --g-100: #1c232b;
+  --g-200: #272f39;
+  --g-300: #37414e;
+  --g-400: #566273;
+  --g-500: #7d8898;
+  --g-600: #9aa4b2;
+  --g-700: #bcc4cf;
+  --g-800: #dde2e8;
+  --g-900: #f2f5f8;
+
+  --brand: #6ea8f0;
+  --brand-ink: #a9cbf7;
+  --brand-wash: #16263a;
+  --brand-ring: rgba(110, 168, 240, 0.32);
+
+  --s-attn: #ef7a6e;
+  --s-attn-ink: #f6a79e;
+  --s-attn-wash: #3a1d1a;
+  --s-attn-line: #5e2b25;
+
+  --s-watch: #e0ab53;
+  --s-watch-ink: #efc983;
+  --s-watch-wash: #352713;
+  --s-watch-line: #56401d;
+
+  --s-normal: #5bbd8a;
+  --s-normal-ink: #8fd4ae;
+  --s-normal-wash: #16301f;
+  --s-normal-line: #24482f;
+
+  --s-unsure: #8d97a5;
+  --s-unsure-ink: #aab3bf;
+  --s-unsure-wash: #1f262e;
+  --s-unsure-line: #37414e;
+
+  --surface: var(--g-50);
+  --surface-raised: var(--g-100);
+  --surface-sunk: var(--g-25);
+  --surface-muted: var(--g-100);
+  --border: var(--g-200);
+  --border-strong: var(--g-300);
+  --map-void: var(--g-25);
+
+  --shadow-rest: 0 1px 2px rgba(0, 0, 0, 0.4), 0 2px 8px rgba(0, 0, 0, 0.32);
+  --shadow-raised: 0 2px 4px rgba(0, 0, 0, 0.42), 0 12px 28px rgba(0, 0, 0, 0.46);
+}

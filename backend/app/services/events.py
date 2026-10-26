@@ -125,6 +125,11 @@ class FireEvent:
     # must not collapse into one.
     distinct_days: int = 0
     history_available: bool = False
+    # Radiative power range recorded at this location before this event. Only
+    # meaningful where the baseline was actually assessed; see priority.py.
+    baseline_frp_min: float | None = None
+    baseline_frp_max: float | None = None
+    baseline_frp_count: int = 0
     # Kept separate from priority_score on purpose: "how unusual" and "how
     # urgently to look" are different questions. None = no baseline to judge
     # against, which is the honest answer for most of this archive.
@@ -290,6 +295,19 @@ def _summarise(members: list[ClassifiedEvent]) -> FireEvent:
         persistent=any(m.evidence.recurrence.is_persistent for m in members),
         distinct_days=max((m.evidence.recurrence.distinct_days for m in members), default=0),
         history_available=any(m.evidence.recurrence.history_available for m in members),
+        baseline_frp_min=min(
+            (m.evidence.recurrence.prior_frp_min for m in members
+             if m.evidence.recurrence.prior_frp_min is not None),
+            default=None,
+        ),
+        baseline_frp_max=max(
+            (m.evidence.recurrence.prior_frp_max for m in members
+             if m.evidence.recurrence.prior_frp_max is not None),
+            default=None,
+        ),
+        baseline_frp_count=max(
+            (m.evidence.recurrence.prior_frp_count for m in members), default=0
+        ),
         abnormality_score=top.priority.abnormality_score,
         abnormality_status=top.priority.abnormality_status,
         risk_factors=_risk_factors(members, top, spread, duration, frps, facility_holder),

@@ -116,6 +116,18 @@ class RecurrenceResult(BaseModel):
     history_available: bool = Field(
         description="False when no history is loaded, in which case counts are not evidence."
     )
+    prior_frp_min: float | None = Field(
+        default=None,
+        description="Lowest radiative power recorded at this location in the window.",
+    )
+    prior_frp_max: float | None = Field(
+        default=None,
+        description="Highest radiative power recorded at this location in the window.",
+    )
+    prior_frp_count: int = Field(
+        default=0,
+        description="How many earlier detections here reported radiative power.",
+    )
 
 
 # ---------------------------------------------------------------------------

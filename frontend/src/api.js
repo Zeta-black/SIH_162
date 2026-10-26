@@ -81,6 +81,21 @@ export const api = {
   summary: (params) => request(`/api/dashboard/summary${query(params)}`),
   scenarios: () => request('/api/scenarios'),
 
+  // --- Pass 2 -------------------------------------------------------------
+  timeline: () => request('/api/timeline'),
+  notifications: (params) => request(`/api/notifications${query(params ?? {})}`),
+  notificationPolicy: () => request('/api/notifications/policy'),
+  notificationAction: (id, body) =>
+    request(`/api/notifications/${encodeURIComponent(id)}/action`, {
+      method: 'POST',
+      body: JSON.stringify(body),
+    }),
+  notificationTest: () => request('/api/notifications/test', { method: 'POST' }),
+  changes: (since) => request(`/api/changes${query({ since })}`),
+  gpkgUrl: (params) => `${BASE}/api/export/gpkg${query(params)}`,
+  geojsonLayerUrl: (layer, params) =>
+    `${BASE}/api/export/geojson/${layer}${query(params)}`,
+
   // The main screen is served by exactly one request, so the summary counts,
   // the markers and the provenance chip can never disagree with each other.
   map: (params, options = {}) => request(`/api/map${query(params)}`, options),

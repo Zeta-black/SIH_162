@@ -1,150 +1,35 @@
-import { useEffect, useId, useMemo, useRef, useState } from 'react'
-import {
-  IconCheck,
-  IconCheckCircle,
-  IconClose,
-  IconDot,
-  IconFlame,
-  IconMinus,
-  IconRefresh,
-  IconSearch,
-  IconWarn,
-} from './mapicons.jsx'
+import { useEffect, useId, useRef, useState } from 'react'
+import { IconCheck, IconClose, IconMinus, IconSearch, IconWarn } from './mapicons.jsx'
 
-/* Every panel on the main screen. Each one is passive: it renders fields the
- * backend supplied and reports clicks upward. No panel composes a sentence of
- * its own, so nothing on screen can say something the API did not. */
+/* Search, filter chips and the evidence drawer.
+ *
+ * Every panel is passive: it renders fields the backend supplied and reports
+ * clicks upward. No panel composes a sentence of its own, so nothing on screen
+ * can say something the API did not.
+ */
 
-// ---------------------------------------------------------------- helpers
-const STATUS_CSS = {
-  needs_attention: 'var(--m-attn)',
-  watch: 'var(--m-watch)',
-  normal: 'var(--m-normal)',
-  not_sure: 'var(--m-unsure)',
-}
-
-/** "12 min ago" / "3 h ago" / "11 Nov 2025". Absolute once it is not today. */
-export function ago(iso) {
-  if (!iso) return null
-  const then = new Date(iso)
-  if (Number.isNaN(then.getTime())) return null
-  const mins = Math.floor((Date.now() - then.getTime()) / 60000)
-  if (mins < 1) return 'just now'
-  if (mins < 60) return `${mins} min ago`
-  const hours = Math.floor(mins / 60)
-  if (hours < 24) return `${hours} h ago`
-  return then.toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })
+const STATUS_VAR = {
+  needs_attention: 'var(--s-attn)',
+  watch: 'var(--s-watch)',
+  normal: 'var(--s-normal)',
+  not_sure: 'var(--s-unsure)',
 }
 
 function absolute(iso) {
   if (!iso) return '—'
-  const d = new Date(iso)
-  if (Number.isNaN(d.getTime())) return '—'
-  return d.toLocaleString('en-IN', {
-    day: 'numeric',
-    month: 'short',
-    year: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-    timeZone: 'UTC',
-  }) + ' UTC'
-}
-
-// ------------------------------------------------------------- brand card
-/**
- * Top-left. Four elements, no more: the name, one summary line, the provenance
- * chip, and the observation age.
- */
-export function BrandCard({ counts, provenance, observedTo, loading, mode, onMode, busy }) {
-  const chip = provenanceChip(provenance)
-
+  const when = new Date(iso)
+  if (Number.isNaN(when.getTime())) return '—'
   return (
-    <div className="m-panel m-brandcard">
-      <div className="m-brand">
-        <span className="m-brand-mark">
-          <IconFlame width={18} height={18} />
-        </span>
-        <span className="m-brand-name">FIRETRACE</span>
-      </div>
-
-      {loading && !counts ? (
-        <div style={{ marginBottom: 'var(--m-s3)' }}>
-          <div className="m-skel m-skel-line" style={{ width: '88%' }} />
-          <div className="m-skel m-skel-line" style={{ width: '54%', marginBottom: 0 }} />
-        </div>
-      ) : (
-        <p className="m-summary">
-          {counts && counts.needs_attention + counts.watch + counts.not_sure + counts.normal > 0 ? (
-            <>
-              <b>{counts.needs_attention}</b> need attention
-              <span className="m-dot"> · </span>
-              <b>{counts.watch}</b> watch
-              <span className="m-dot"> · </span>
-              <b>{counts.normal}</b> normal
-            </>
-          ) : (
-            'No thermal detections in this window.'
-          )}
-        </p>
-      )}
-
-      <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--m-s2)', flexWrap: 'wrap' }}>
-        <span className={`m-chip ${chip.className}`} title={provenance?.detail ?? ''}>
-          <span className="m-chip-led" />
-          {chip.label}
-        </span>
-
-        {/* Switching source is a two-state control, not a hidden setting: the
-            demo has to be able to leave a dead venue network in one click. */}
-        {onMode && (
-          <button
-            className="m-ghost"
-            style={{ position: 'static', height: 28, boxShadow: 'none', padding: '0 10px' }}
-            onClick={() => onMode(mode === 'demo' ? 'auto' : 'demo')}
-            disabled={busy}
-            title={
-              mode === 'demo'
-                ? 'Try the live NASA FIRMS feed'
-                : 'Switch to the offline historical archive'
-            }
-          >
-            {mode === 'demo' ? 'Try live' : 'Use archive'}
-          </button>
-        )}
-      </div>
-
-      {observedTo && (
-        <div className="m-age">
-          Satellite observation {ago(observedTo)}
-          {provenance?.retrieved_at ? ` · checked ${ago(provenance.retrieved_at)}` : ''}
-        </div>
-      )}
-    </div>
+    when.toLocaleString('en-IN', {
+      day: 'numeric',
+      month: 'short',
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: false,
+      timeZone: 'Asia/Kolkata',
+    }) + ' IST'
   )
-}
-
-/**
- * The provenance chip is the single most important honesty surface on the
- * screen, so its five states are explicit and never computed from a truthy
- * check. A replay must not be able to look like live data.
- */
-export function provenanceChip(p) {
-  switch (p?.state) {
-    case 'live':
-      return { className: 'm-chip-live', label: 'Live · NASA FIRMS' }
-    case 'live_empty':
-      return { className: 'm-chip-empty', label: 'Live · no detections in window' }
-    case 'offline':
-      return { className: 'm-chip-offline', label: 'Offline · showing saved data' }
-    case 'replay':
-      return { className: 'm-chip-replay', label: 'Replay · real historical data' }
-    case 'simulated':
-      return { className: 'm-chip-offline', label: 'Simulated scenario' }
-    case 'unavailable':
-      return { className: 'm-chip-down', label: 'Live feed unavailable' }
-    default:
-      return { className: 'm-chip-empty', label: 'Connecting…' }
-  }
 }
 
 // ----------------------------------------------------------------- search
@@ -155,8 +40,8 @@ export function SearchBar({ value, onChange, results, onPick, busy, loading }) {
   const listId = useId()
 
   useEffect(() => {
-    const away = (e) => {
-      if (wrapRef.current && !wrapRef.current.contains(e.target)) setOpen(false)
+    const away = (event) => {
+      if (wrapRef.current && !wrapRef.current.contains(event.target)) setOpen(false)
     }
     document.addEventListener('mousedown', away)
     return () => document.removeEventListener('mousedown', away)
@@ -167,89 +52,95 @@ export function SearchBar({ value, onChange, results, onPick, busy, loading }) {
   const show = open && value.trim().length >= 2
   const items = results ?? []
 
-  const onKeyDown = (e) => {
+  const onKeyDown = (event) => {
     if (!show) return
-    if (e.key === 'ArrowDown') {
-      e.preventDefault()
+    if (event.key === 'ArrowDown') {
+      event.preventDefault()
       setCursor((c) => Math.min(c + 1, items.length - 1))
-    } else if (e.key === 'ArrowUp') {
-      e.preventDefault()
+    } else if (event.key === 'ArrowUp') {
+      event.preventDefault()
       setCursor((c) => Math.max(c - 1, 0))
-    } else if (e.key === 'Enter' && cursor >= 0 && items[cursor]) {
-      e.preventDefault()
+    } else if (event.key === 'Enter' && cursor >= 0 && items[cursor]) {
+      event.preventDefault()
       onPick(items[cursor])
       setOpen(false)
-    } else if (e.key === 'Escape') {
+    } else if (event.key === 'Escape') {
       setOpen(false)
     }
   }
 
   return (
     <div style={{ position: 'relative' }} ref={wrapRef}>
-      <div className="m-search">
-        <IconSearch />
-        {/* role="combobox" is required for aria-expanded/aria-controls to be
-            legal here: axe-core flags them as unsupported on a bare searchbox
-            (rule aria-allowed-attr, critical). With the role set, the input and
-            its results list form a proper combobox pattern. */}
+      <div className="fc-search">
+        <IconSearch width={16} height={16} />
         <input
           type="search"
-          role="combobox"
           value={value}
           placeholder="Search a facility or company"
           aria-label="Search a mapped industrial facility or company"
           aria-expanded={show}
           aria-controls={listId}
-          aria-autocomplete="list"
           autoComplete="off"
-          onChange={(e) => {
-            onChange(e.target.value)
+          onChange={(event) => {
+            onChange(event.target.value)
             setOpen(true)
           }}
           onFocus={() => setOpen(true)}
           onKeyDown={onKeyDown}
         />
-        {value && (
-          <button className="m-search-clear" onClick={() => onChange('')} aria-label="Clear search">
+        {value ? (
+          <button
+            type="button"
+            className="fc-iconbtn fc-iconbtn-sm"
+            onClick={() => onChange('')}
+            aria-label="Clear search"
+          >
             <IconClose width={14} height={14} />
           </button>
+        ) : (
+          /* A quiet hint that the palette exists, rather than a tour. */
+          <span className="fc-kbdhint" aria-hidden="true">
+            <kbd>Ctrl</kbd>
+            <kbd>K</kbd>
+          </span>
         )}
       </div>
 
       {show && (
-        <div className="m-results" id={listId} role="listbox">
+        <div className="fc-results" id={listId} role="listbox">
           {busy && !items.length ? (
-            <div className="m-empty-note">Searching…</div>
+            <p className="fc-pop-empty">Searching…</p>
           ) : items.length ? (
-            items.map((r, i) => (
+            items.map((hit, index) => (
               <button
-                key={`${r.kind}-${r.id}`}
-                className="m-result"
+                key={`${hit.kind}-${hit.id}`}
+                type="button"
+                className="fc-result"
                 role="option"
-                aria-selected={i === cursor}
+                aria-selected={index === cursor}
                 onClick={() => {
-                  onPick(r)
+                  onPick(hit)
                   setOpen(false)
                 }}
               >
                 <span
-                  className="m-filter-swatch"
-                  style={{ background: r.status ? STATUS_CSS[r.status] : 'var(--m-border-strong)' }}
+                  className="fc-swatch"
+                  style={{
+                    background: hit.status ? STATUS_VAR[hit.status] : 'var(--border-strong)',
+                  }}
                 />
                 <span style={{ minWidth: 0, flex: 1 }}>
-                  <span className="m-result-name" style={{ display: 'block' }}>
-                    {r.name}
-                  </span>
-                  <span className="m-result-detail">{r.detail}</span>
+                  <span className="fc-result-name">{hit.name}</span>
+                  <span className="fc-result-detail">{hit.detail}</span>
                 </span>
               </button>
             ))
           ) : (
-            <div className="m-empty-note">
+            <p className="fc-pop-empty">
               {loading
                 ? 'Loading detections…'
                 : 'No mapped facility matches. This searches OpenStreetMap facility names, not place names.'}
-            </div>
+            </p>
           )}
         </div>
       )}
@@ -258,191 +149,29 @@ export function SearchBar({ value, onChange, results, onPick, busy, loading }) {
 }
 
 // ---------------------------------------------------------------- filters
-export function FilterChips({ active, onToggle, windowDays, onWindow, counts }) {
+export function FilterChips({ active, onToggle, counts }) {
+  // Counts are shown on every chip or none, so the row cannot look like some
+  // numbers are missing. A zero is information.
   const chips = [
     { key: 'needs_attention', label: 'Needs attention' },
     { key: 'watch', label: 'Watch' },
-    { key: 'not_sure', label: `Not sure${counts?.not_sure ? ` ${counts.not_sure}` : ''}` },
+    { key: 'not_sure', label: 'Not sure' },
   ]
+  const haveCounts = counts && typeof counts.needs_attention === 'number'
 
   return (
-    <div className="m-filters">
-      {chips.map((c) => (
+    <div className="fc-filters">
+      {chips.map((chip) => (
         <button
-          key={c.key}
-          className="m-filter"
-          aria-pressed={active.includes(c.key)}
-          onClick={() => onToggle(c.key)}
+          key={chip.key}
+          type="button"
+          className="fc-chip"
+          aria-pressed={active.includes(chip.key)}
+          onClick={() => onToggle(chip.key)}
         >
-          <span className="m-filter-swatch" style={{ background: STATUS_CSS[c.key] }} />
-          {c.label}
-        </button>
-      ))}
-      <button
-        className="m-filter"
-        aria-pressed={windowDays > 1}
-        onClick={() => onWindow(windowDays > 1 ? 1 : 3)}
-        title="Switch the observation window"
-      >
-        {windowDays > 1 ? 'Last 3 days' : 'Last 24 h'}
-      </button>
-    </div>
-  )
-}
-
-// -------------------------------------------------------------- site card
-/**
- * The content budget here is the whole point: a status chip, one verdict
- * sentence, at most three why-lines, one small chart and the uncertainty note.
- * Everything quantitative is one click away in the evidence drawer.
- */
-export function SiteCard({ site, onClose, onEvidence, onReview, reviewed }) {
-  if (!site) return null
-
-  return (
-    <div
-      className="m-panel m-sitecard"
-      role="dialog"
-      aria-label={`${site.status_label}: ${site.title}`}
-    >
-      <div className="m-card-head">
-        <div style={{ flex: 1, minWidth: 0 }}>
-          <div className="m-card-title">{site.title}</div>
-          <div className="m-card-sub">{site.subtitle}</div>
-        </div>
-        <button className="m-close" onClick={onClose} aria-label="Close details">
-          <IconClose />
-        </button>
-      </div>
-
-      <div className="m-card-body">
-        <span className={`m-status-chip m-status-${site.status}`}>
-          <IconDot width={10} height={10} />
-          {site.status_label}
-        </span>
-
-        <p className="m-verdict">{site.verdict}</p>
-
-        {site.why?.length > 0 && (
-          <ul className="m-why">
-            {site.why.map((w) => (
-              <li key={w}>
-                <IconCheck width={13} height={13} />
-                <span>{w}</span>
-              </li>
-            ))}
-          </ul>
-        )}
-
-        <HeatBand site={site} />
-
-        {site.missing?.length > 0 && (
-          <div className="m-unsure-note">
-            <b>Not sure about:</b> {site.missing.slice(0, 2).join('. ')}.
-          </div>
-        )}
-      </div>
-
-      <div className="m-actions">
-        <button className="m-btn" onClick={onEvidence}>
-          See evidence
-        </button>
-        <button className="m-btn m-btn-primary" onClick={onReview} disabled={reviewed}>
-          {reviewed ? (
-            <>
-              <IconCheckCircle width={14} height={14} />
-              Reviewed
-            </>
-          ) : (
-            'Mark reviewed'
-          )}
-        </button>
-      </div>
-    </div>
-  )
-}
-
-/**
- * The one small chart: this detection's peak radiative power against the range
- * recorded at this location.
- *
- * When there is no usable history the band is not drawn at all. An invented
- * "normal" band would be the single most misleading pixel on the screen, so
- * the honest version of this chart is sometimes no chart.
- */
-function HeatBand({ site }) {
-  const frp = site.frp_max_mw
-  if (frp === null || frp === undefined) {
-    return (
-      <div className="m-band">
-        <div className="m-band-label">Heat output</div>
-        <div className="m-band-note">Radiative power was not reported for this detection.</div>
-      </div>
-    )
-  }
-
-  const hasBaseline = site.history_available && site.distinct_days > 0
-  // A fixed reference scale, labelled as such — not a per-facility baseline.
-  const scaleMax = Math.max(frp * 1.25, 40)
-  const pct = Math.min(100, (frp / scaleMax) * 100)
-
-  return (
-    <div className="m-band">
-      <div className="m-band-label">Heat output</div>
-      <div
-        style={{
-          position: 'relative',
-          height: 26,
-          background: 'var(--m-surface-sunk)',
-          borderRadius: 6,
-          border: '1px solid var(--m-border)',
-        }}
-        role="img"
-        aria-label={`Peak radiative power ${frp.toFixed(1)} megawatts`}
-      >
-        <div
-          style={{
-            position: 'absolute',
-            left: `calc(${pct}% - 2px)`,
-            top: 3,
-            bottom: 3,
-            width: 4,
-            borderRadius: 2,
-            background: STATUS_CSS[site.status],
-          }}
-        />
-      </div>
-      <div className="m-band-note">
-        Peak {frp.toFixed(1)} MW on a 0–{Math.round(scaleMax)} MW scale.{' '}
-        {hasBaseline
-          ? `This location was detected on ${site.distinct_days} earlier ${
-              site.distinct_days === 1 ? 'day' : 'days'
-            } in the history window.`
-          : 'No usable history at this location, so no normal range is drawn.'}
-      </div>
-    </div>
-  )
-}
-
-// --------------------------------------------------------- attention list
-export function AttentionList({ sites, onPick, selectedId }) {
-  const top = useMemo(() => sites.slice(0, 5), [sites])
-  if (!top.length) return null
-
-  return (
-    <div className="m-panel m-attnlist">
-      <div className="m-attnlist-head">
-        <span>Needs attention first</span>
-      </div>
-      {top.map((s) => (
-        <button
-          key={s.id}
-          className="m-attnrow"
-          onClick={() => onPick(s.id)}
-          aria-current={s.id === selectedId ? 'true' : undefined}
-        >
-          <span className="m-attnrow-swatch" style={{ background: STATUS_CSS[s.status] }} />
-          <span className="m-attnrow-name">{s.title}</span>
+          <span className="fc-swatch" style={{ background: STATUS_VAR[chip.key] }} />
+          {chip.label}
+          {haveCounts ? ` ${counts[chip.key] ?? 0}` : ''}
         </button>
       ))}
     </div>
@@ -460,8 +189,8 @@ export function EvidenceDrawer({ site, provenance, model, disclaimer, onClose })
 
   useEffect(() => {
     closeRef.current?.focus()
-    const onKey = (e) => {
-      if (e.key === 'Escape') onClose()
+    const onKey = (event) => {
+      if (event.key === 'Escape') onClose()
     }
     document.addEventListener('keydown', onKey)
     return () => document.removeEventListener('keydown', onKey)
@@ -469,30 +198,35 @@ export function EvidenceDrawer({ site, provenance, model, disclaimer, onClose })
 
   if (!site) return null
 
-  const missing = new Set(site.missing ?? [])
-  const groups = buildEvidenceGroups(site, missing)
+  const groups = buildEvidenceGroups(site, new Set(site.missing ?? []))
 
   return (
     <>
-      <div className="m-drawer-scrim" onClick={onClose} />
-      <div className="m-drawer" role="dialog" aria-modal="true" aria-label="Evidence">
-        <div className="m-drawer-head">
-          <span className="m-drawer-title">Evidence</span>
-          <button className="m-close" ref={closeRef} onClick={onClose} aria-label="Close evidence">
-            <IconClose />
+      <div className="fc-scrim" onClick={onClose} />
+      <div className="fc-drawer" role="dialog" aria-modal="true" aria-label="Evidence">
+        <header className="fc-drawer-head">
+          <span className="fc-drawer-title">Evidence</span>
+          <button
+            type="button"
+            className="fc-iconbtn fc-iconbtn-sm"
+            ref={closeRef}
+            onClick={onClose}
+            aria-label="Close evidence"
+          >
+            <IconClose width={15} height={15} />
           </button>
-        </div>
+        </header>
 
-        <div className="m-drawer-body">
-          <p style={{ fontSize: 'var(--m-t-xs)', color: 'var(--m-ink-2)', margin: '0 0 var(--m-s4)', lineHeight: 1.5 }}>
+        <div className="fc-drawer-body">
+          <p style={{ fontSize: 'var(--t-12)', color: 'var(--ink-2)', margin: '0 0 var(--sp-4)', lineHeight: 1.5 }}>
             {site.title} · {site.status_label}
           </p>
 
-          {groups.map((g) => (
-            <section className="m-group" key={g.title}>
-              <h3 className="m-group-title">{g.title}</h3>
-              {g.items.map((item) => (
-                <div className={`m-ev m-ev-${item.kind}`} key={item.text}>
+          {groups.map((group) => (
+            <section className="fc-group" key={group.title}>
+              <h3 className="fc-group-title">{group.title}</h3>
+              {group.items.map((item) => (
+                <div className={`fc-ev fc-ev-${item.kind}`} key={item.text}>
                   {item.kind === 'supporting' ? (
                     <IconCheck width={14} height={14} />
                   ) : item.kind === 'contradicting' ? (
@@ -506,18 +240,18 @@ export function EvidenceDrawer({ site, provenance, model, disclaimer, onClose })
             </section>
           ))}
 
-          <section className="m-group">
-            <h3 className="m-group-title">What this is not</h3>
-            <p style={{ fontSize: 'var(--m-t-xs)', color: 'var(--m-ink-2)', lineHeight: 1.5, margin: 0 }}>
+          <section className="fc-group">
+            <h3 className="fc-group-title">What this is not</h3>
+            <p style={{ fontSize: 'var(--t-12)', color: 'var(--ink-2)', lineHeight: 1.55, margin: 0 }}>
               Proximity to a facility is context, not proof of cause. A detection on a
               site does not establish that the site caused it. {disclaimer}
             </p>
           </section>
 
-          <details className="m-fold">
+          <details className="fc-fold">
             <summary>Details for experts</summary>
-            <div className="m-fold-body">
-              <dl className="m-kv">
+            <div className="fc-fold-body">
+              <dl className="fc-kv">
                 <dt>Predicted class</dt>
                 <dd>{site.predicted_class_display}</dd>
 
@@ -532,16 +266,10 @@ export function EvidenceDrawer({ site, provenance, model, disclaimer, onClose })
                   {site.operational_priority} · {site.priority_score?.toFixed(3)}
                 </dd>
 
-                {/* Abnormality is shown as its own row, never folded into the
-                    score. "Not assessed" is a real answer here and appears for
-                    most sites, because most locations in the archive have too
-                    little history for "unusual" to mean anything. */}
                 <dt>Abnormality for this site</dt>
                 <dd>
                   {site.abnormality_score === null || site.abnormality_score === undefined
-                    ? site.abnormality_status === 'no_history_loaded'
-                      ? 'no history loaded'
-                      : 'not assessed — too little history here'
+                    ? 'not assessed — too little history here'
                     : `${site.abnormality_score}/100`}
                 </dd>
 
@@ -574,13 +302,13 @@ export function EvidenceDrawer({ site, provenance, model, disclaimer, onClose })
                 <dd>{absolute(site.observed_at)}</dd>
 
                 <dt>Retrieved at</dt>
-                <dd>{absolute(provenance?.retrieved_at)}</dd>
+                <dd>{absolute(provenance?.feed?.retrieved_at ?? provenance?.retrieved_at)}</dd>
 
                 <dt>Source</dt>
                 <dd>{(site.products ?? []).join(', ') || provenance?.source}</dd>
 
-                <dt>Provenance</dt>
-                <dd>{provenanceChip(provenance).label}</dd>
+                <dt>Data state</dt>
+                <dd>{provenance?.surface === 'past' ? 'Past data' : 'Live'}</dd>
 
                 <dt>Model version</dt>
                 <dd>
@@ -588,7 +316,7 @@ export function EvidenceDrawer({ site, provenance, model, disclaimer, onClose })
                 </dd>
               </dl>
 
-              <p style={{ fontSize: 11, color: 'var(--m-ink-3)', marginTop: 'var(--m-s3)', marginBottom: 0, lineHeight: 1.5 }}>
+              <p style={{ fontSize: 'var(--t-11)', color: 'var(--ink-3)', marginTop: 'var(--sp-3)', marginBottom: 0, lineHeight: 1.55 }}>
                 {model?.score_note}
               </p>
             </div>
@@ -604,7 +332,7 @@ export function EvidenceDrawer({ site, provenance, model, disclaimer, onClose })
  *
  * `missing` lines come from the backend's missing_evidence(); they are never
  * folded in as supporting evidence. An unmapped land-cover polygon is an
- * absence, and the previous factor generator marked some of these as
+ * absence, and the original factor generator marked some of these as
  * "supports", which is the specific mistake this separation prevents.
  */
 function buildEvidenceGroups(site, missing) {
@@ -630,7 +358,7 @@ function buildEvidenceGroups(site, missing) {
     place.push({ kind: 'missing', text: 'No mapped industrial facility within the search radius' })
   }
   if (site.land_cover && !/unknown|not mapped/i.test(site.land_cover)) {
-    place.push({ kind: 'supporting', text: `Land cover: ${site.land_cover}` })
+    place.push({ kind: 'supporting', text: `Surroundings: ${site.land_cover}` })
   } else {
     place.push({ kind: 'missing', text: 'Land cover is not mapped here in OpenStreetMap' })
   }
@@ -642,7 +370,7 @@ function buildEvidenceGroups(site, missing) {
     history.push({
       kind: site.persistent ? 'contradicting' : 'supporting',
       text: site.persistent
-        ? `Recurring source — detected on ${site.distinct_days} separate days, which counts against an incident reading`
+        ? `Persistent source — detected on ${site.distinct_days} separate days, which counts against an incident reading`
         : `Detected on ${site.distinct_days} earlier ${site.distinct_days === 1 ? 'day' : 'days'} in the history window`,
     })
   } else {
@@ -655,12 +383,18 @@ function buildEvidenceGroups(site, missing) {
         ? `Confirmed across ${site.distinct_passes} separate satellite passes`
         : 'Only one satellite pass so far — not yet corroborated',
   })
+  if (site.abnormality_status && site.abnormality_status !== 'assessed') {
+    history.push({
+      kind: 'missing',
+      text: 'Not enough history here to say whether this is unusual for this location',
+    })
+  }
 
-  const context = [{ kind: 'missing', text: 'Optical confirmation: not available' }]
-  for (const m of missing) {
-    if (/optical/i.test(m)) continue
-    if (![...heat, ...place, ...history].some((i) => i.text === m)) {
-      context.push({ kind: 'missing', text: m })
+  const context = [{ kind: 'missing', text: 'Optical check: not available' }]
+  for (const line of missing) {
+    if (/optical/i.test(line)) continue
+    if (![...heat, ...place, ...history].some((item) => item.text === line)) {
+      context.push({ kind: 'missing', text: line })
     }
   }
 
@@ -670,24 +404,4 @@ function buildEvidenceGroups(site, missing) {
     { title: 'History', items: history },
     { title: 'Context', items: context },
   ]
-}
-
-// --------------------------------------------------------------- banner
-export function FallbackBanner({ provenance, onRetry, busy }) {
-  if (!provenance) return null
-  if (provenance.state !== 'offline' && provenance.state !== 'unavailable') return null
-
-  return (
-    <div className="m-banner" role="status">
-      <span style={{ flex: 1 }}>
-        {provenance.state === 'offline'
-          ? `Live feed unavailable — showing saved data. ${provenance.detail ?? ''}`
-          : `Live feed unavailable. ${provenance.detail ?? ''}`}
-      </span>
-      <button className="m-banner-retry" onClick={onRetry} disabled={busy}>
-        <IconRefresh width={12} height={12} style={{ verticalAlign: '-2px', marginRight: 4 }} />
-        {busy ? 'Retrying…' : 'Retry'}
-      </button>
-    </div>
-  )
 }
