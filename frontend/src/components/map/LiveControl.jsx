@@ -56,7 +56,6 @@ export default function LiveControl({
   activeRange,
   onSelectLive,
   onSelectRange,
-  loading,
   counts,
   // Which surface the user asked for. Separate from what the payload says, so
   // the control responds to a click without waiting for a fetch.

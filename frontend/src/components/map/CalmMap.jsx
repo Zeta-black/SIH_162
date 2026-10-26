@@ -209,6 +209,20 @@ export default function CalmMap({
     markerLayerRef.current = L.layerGroup().addTo(map)
     mapRef.current = map
 
+    /* Expose the instance on its container for the frame-rate harness.
+     *
+     * Nothing in the app reads this. It exists because measuring pan and zoom
+     * over CDP measures Playwright's event-dispatch rate rather than the page —
+     * the first attempt reported 16 fps on a screen with four markers — and
+     * driving Leaflet's own pan/zoom from a rAF loop in the page measures the
+     * redraw path instead. See scripts/checks/perf.mjs.
+     *
+     * The host element IS the .leaflet-container; Leaflet adds that class to the
+     * element it was given rather than creating a child. Querying for a child
+     * returned null and setting a property on it threw, blanking the entire
+     * app — caught by the perf harness on the production build. */
+    if (hostRef.current) hostRef.current._leaflet_map = map
+
     requestAnimationFrame(() => {
       const host = hostRef.current
       host?.querySelector('.leaflet-control-zoom-in')?.setAttribute('aria-label', 'Zoom in')

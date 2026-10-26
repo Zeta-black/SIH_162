@@ -17,7 +17,8 @@
     "build-data": "node scripts/run.mjs build-data",
     "build-snapshot": "node scripts/run.mjs build-snapshot",
     "benchmark": "node scripts/run.mjs benchmark",
-    "smoke:pipeline": "node scripts/run.mjs smoke"
+    "smoke:pipeline": "node scripts/run.mjs smoke",
+    "perf": "node scripts/perf.mjs"
   },
   "engines": {
     "node": ">=18"

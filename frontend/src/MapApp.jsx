@@ -493,7 +493,6 @@ export default function MapApp() {
         activeRange={activeRange}
         onSelectLive={goLive}
         onSelectRange={selectRange}
-        loading={loading}
         counts={counts}
         requestedPast={isPast}
       />

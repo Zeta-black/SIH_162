@@ -76,32 +76,74 @@ const markers = await page.evaluate(
   () => document.querySelectorAll('.fc-marker, .fc-cluster').length,
 )
 
-// --------------------------------------------------------------- pan
-await measure('pan', async (ms) => {
-  const start = Date.now()
-  const box = await page.locator('.fc-canvas').boundingBox()
-  const cx = box.x + box.width / 2
-  const cy = box.y + box.height / 2
-  await page.mouse.move(cx, cy)
-  await page.mouse.down()
-  let i = 0
-  while (Date.now() - start < ms) {
-    i += 1
-    await page.mouse.move(cx + Math.sin(i / 6) * 160, cy + Math.cos(i / 9) * 90)
-  }
-  await page.mouse.up()
+/* Driving happens INSIDE the page, not over CDP.
+ *
+ * The first version drove with `page.mouse.move()` in a tight loop and measured
+ * 16 fps on a screen with four markers. That was the harness, not the app: every
+ * Playwright input event is an IPC round trip, so the loop could only issue a
+ * few dozen a second and the page sat idle between them. Calling Leaflet's own
+ * pan and zoom from a rAF loop in the page measures the redraw path, which is
+ * the thing worth knowing. */
+await page.evaluate(() => {
+  // CalmMap stashes the instance on its container element for exactly this.
+  const container = document.querySelector('.leaflet-container')
+  window.__map = container?._leaflet_map ?? null
 })
 
-// -------------------------------------------------------------- zoom
-await measure('zoom', async (ms) => {
-  const start = Date.now()
-  const box = await page.locator('.fc-canvas').boundingBox()
-  await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2)
-  while (Date.now() - start < ms) {
-    await page.mouse.wheel(0, Date.now() % 600 < 300 ? -120 : 120)
-    await page.waitForTimeout(60)
-  }
-})
+/** Pan the map back and forth from inside the page. */
+async function drivePan(ms) {
+  await page.evaluate(
+    (duration) =>
+      new Promise((resolve) => {
+        const map = window.__map
+        const end = performance.now() + duration
+        let i = 0
+        const step = () => {
+          i += 1
+          if (map) map.panBy([i % 2 ? 24 : -24, i % 3 ? 12 : -12], { animate: false })
+          if (performance.now() < end) requestAnimationFrame(step)
+          else resolve()
+        }
+        requestAnimationFrame(step)
+      }),
+    ms,
+  )
+}
+
+/** Zoom in and out from inside the page. */
+async function driveZoom(ms) {
+  await page.evaluate(
+    (duration) =>
+      new Promise((resolve) => {
+        const map = window.__map
+        const end = performance.now() + duration
+        let z = map ? map.getZoom() : 5
+        let dir = 0.25
+        const step = () => {
+          if (map) {
+            z += dir
+            if (z > 8) dir = -0.25
+            if (z < 4.5) dir = 0.25
+            map.setZoom(z, { animate: false })
+          }
+          if (performance.now() < end) requestAnimationFrame(step)
+          else resolve()
+        }
+        requestAnimationFrame(step)
+      }),
+    ms,
+  )
+}
+
+const hasMap = await page.evaluate(() => Boolean(window.__map))
+
+if (hasMap) {
+  await measure('pan', drivePan)
+  await measure('zoom', driveZoom)
+} else {
+  results.push({ label: 'pan', note: 'could not reach the Leaflet instance' })
+  results.push({ label: 'zoom', note: 'could not reach the Leaflet instance' })
+}
 
 // ------------------------------------------------------------ replay
 const hasTimeline = (await page.locator('.fc-tl-play').count()) > 0
