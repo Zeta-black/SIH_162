@@ -9,7 +9,7 @@ is cheap to prevent and expensive to fix in the room.
 
 - [ ] **`git status` is clean** and you are on the branch you mean to demo.
 - [ ] **Charge the laptop to 100%.** Pack the charger.
-- [ ] **Run the full gate:** `npm run smoke` → expect `SMOKE PASS 50/50`.
+- [ ] **Run the full gate:** `npm run smoke` → expect `SMOKE PASS 80/80`.
       If anything is red, fix it tonight, not tomorrow.
 - [ ] **Run `npm run demo`** and click the entire script end to end, out loud,
       with a timer. Three minutes is shorter than it sounds.
@@ -44,12 +44,16 @@ is cheap to prevent and expensive to fix in the room.
       basemap is instant in the room.
 - [ ] **Click through the three demo sites once** so the backend has them warm.
       Use the exact links, then bookmark them:
-      - `?demo=1&site=FE-2026-43C5` — ArcelorMittal, Needs attention
-      - `?demo=1&site=FE-2026-4BA6` — ArcelorMittal, Normal (the 36 MW flare)
+      - `?demo=1&site=FE-2026-43C5` — ArcelorMittal, Needs attention / New heat
+      - `?demo=1&site=FE-2026-4BA6` — ArcelorMittal, Normal / Persistent source (36 MW)
       - `?demo=1&site=FE-2026-66C8` — Block - B coal mine, Not sure
 - [ ] **Close everything else** — Slack, email, other browser profiles, anything
       that can raise a notification.
 - [ ] **Turn off notifications** (Windows: Focus assist → Alarms only).
+- [ ] **Open the bell once** and confirm the panel renders. If you intend to show
+      browser alerts, click *Enable browser alerts* now and accept the prompt —
+      never do that on stage.
+- [ ] **Click Layers → Download GIS data once** so the export path is warm.
 
 ---
 
@@ -78,12 +82,12 @@ Know these cold. Practise them.
 | Symptom | Action |
 |---|---|
 | Map blank or stale | **F5** |
-| Anything says "Live" but looks wrong | Click **Use archive** |
-| Spinner past ~10 s on a live switch | Click **Use archive**, say the fallback line |
+| Anything says "Live" but looks wrong | Click **Past data** and pick a period |
+| Spinner past ~10 s on a live switch | Click **Past data**, say the fallback line |
 | Card will not open | Click the marker on the map instead of the list row |
 | Search returns nothing | It only searches facility names — type `Arcelor` |
 | Backend died (terminal shows an exit) | Ctrl+C, then `npm run demo:offline` — ~20 s |
-| Port already in use | `FIRETRACE_WEB_PORT=5190 npm run demo:offline` |
+| Port already in use | Nothing — the launcher steps to the next free port and says so |
 | Everything is broken | Play the screen recording and keep narrating |
 
 ---
@@ -107,6 +111,15 @@ OpenStreetMap throttles bulk fetching. Mitigated by loading the page once an
 hour before so tiles are cached. If it still happens the markers and all the
 panels still work — say *"the basemap is a public tile service and it's rate
 limiting us; the data layer is ours and it's all here."*
+
+**A judge asks "how is this real-time?"**
+It is not, and saying so is the strong answer. `JUDGE_QA.md` Q1: FIRMS publishes
+a few hours after the pass, we show the observation age, and we deliberately say
+near-real-time. Never say "real-time".
+
+**A judge asks why abnormality covers so few sites.**
+`JUDGE_QA.md` Q11. Four percent, honestly, versus seventy percent fabricated in
+our previous build. Own it — the fix is a denser archive, not more code.
 
 **A judge asks about the 1.0 accuracy.**
 `JUDGE_QA.md` Q3. Answer it directly and immediately — the circularity is

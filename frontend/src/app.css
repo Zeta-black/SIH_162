@@ -596,7 +596,14 @@
 }
 .fc-chip[aria-pressed='true'] .fc-swatch { box-shadow: 0 0 0 1.5px color-mix(in srgb, var(--ink-inverse) 55%, transparent); }
 
-.fc-app:has(.fc-past-badge) .fc-searchwrap { top: 42px; }
+/* Scoped to desktop on purpose.
+ *
+ * This selector is 0-2-0 and the mobile rule below is 0-1-0, so unscoped it won
+ * the cascade inside the phone breakpoint and pinned the search bar back over
+ * the Live card — even though the badge it keys on is display:none there. */
+@media (min-width: 761px) {
+  .fc-app:has(.fc-past-badge) .fc-searchwrap { top: 42px; }
+}
 
 /* ---- top-right cluster ----------------------------------------------- */
 .fc-topright {
@@ -1304,57 +1311,116 @@
   .fc-live { width: 272px; }
 }
 
-/* Phone. The detail card becomes a proper bottom sheet with snap points; see
-   .fc-sitecard in card.css. */
+/* Phone.
+ *
+ * Everything stacks from the top and the bottom belongs to the sheet.
+ *
+ * The first attempt put the search bar at the bottom, thumb-reachable, which is
+ * right on a map app — until the detail sheet opens on the same edge and buries
+ * it. Rather than play z-index games, the whole chrome moves to the top on
+ * mobile and the bottom is reserved for the sheet and the one timeline. */
 @media (max-width: 760px) {
   .fc-live {
     left: var(--sp-2);
     right: var(--sp-2);
-    top: var(--sp-2);
+    top: calc(var(--sp-2) + env(safe-area-inset-top, 0px));
     width: auto;
+    padding: var(--sp-3);
   }
+
+  /* The replay badge becomes a row inside the card instead of a floating block
+     over the wordmark. */
+  .fc-past-badge {
+    position: static;
+    transform: none;
+    display: none;
+  }
+  .fc-past-rule { height: 4px; }
+
+  /* The summary line is dropped on a phone.
+   *
+   * It said the same thing as the filter chips immediately below it, and the
+   * duplication was also what made the card's height unpredictable — which an
+   * earlier attempt tried to solve by measuring the card at runtime and
+   * publishing a CSS variable. Removing the redundancy removes the race, and
+   * the screen reads better for it. The counts are still announced to screen
+   * readers through the live region. */
+  .fc-summary { display: none; }
+
   .fc-searchwrap {
-    top: auto;
-    bottom: calc(var(--sp-2) + env(safe-area-inset-bottom, 0px));
     left: var(--sp-2);
     right: var(--sp-2);
     transform: none;
-    display: flex;
-    flex-direction: column-reverse;
+    /* The card is now a fixed height on mobile: mark row + segments + one
+       freshness line. */
+    top: 122px;
   }
   .fc-filters {
     flex-wrap: nowrap;
     overflow-x: auto;
     justify-content: flex-start;
-    margin: 0 0 var(--sp-2);
+    margin-top: var(--sp-2);
     padding-bottom: 2px;
     scrollbar-width: none;
   }
   .fc-filters::-webkit-scrollbar { display: none; }
-  .fc-results { max-height: 46vh; margin: 0 0 var(--sp-2); }
+  .fc-results { max-height: 42vh; }
 
   .fc-queue { display: none; }
-  .fc-topright { top: auto; bottom: 118px; right: var(--sp-2); }
+  .fc-footlink { display: none; }
+
+  /* Map controls hug the right edge, above the sheet's tallest snap point so
+     they are never buried. */
+  .fc-topright {
+    top: 224px;
+    right: var(--sp-2);
+    flex-direction: column;
+  }
+  .fc-mapctl {
+    bottom: auto;
+    top: 224px;
+    right: calc(var(--sp-2) + 52px);
+    align-items: flex-end;
+  }
+  .fc-maptype button span { display: none; }
+  .fc-maptype button { padding: 0 var(--sp-3); }
+
   .fc-notifpanel {
     position: fixed;
-    top: auto;
-    bottom: 170px;
+    top: 224px;
     left: var(--sp-2);
     right: var(--sp-2);
     width: auto;
+    max-height: 52vh;
   }
-  .fc-mapctl { bottom: 170px; right: var(--sp-2); }
-  .fc-footlink { display: none; }
-  .fc-toast { left: var(--sp-2); right: var(--sp-2); width: auto; bottom: 170px; }
+  .fc-layers {
+    right: 0;
+    bottom: auto;
+    top: calc(100% + 8px);
+  }
+
+  .fc-toast {
+    left: var(--sp-2);
+    right: var(--sp-2);
+    width: auto;
+    bottom: calc(var(--sp-2) + env(safe-area-inset-bottom, 0px));
+  }
   .fc-timeline {
     left: var(--sp-2);
     right: var(--sp-2);
     transform: none;
     width: auto;
-    bottom: 170px;
+    bottom: calc(var(--sp-2) + env(safe-area-inset-bottom, 0px));
     flex-wrap: wrap;
+    row-gap: var(--sp-2);
   }
-  .fc-newpill { top: 112px; }
+  .fc-newpill { top: auto; bottom: 96px; }
+
+  /* Leaflet's own zoom buttons are redundant on a touch screen that pinches,
+     and they would sit under the sheet. */
+  .fc-canvas .leaflet-control-container .leaflet-bottom.leaflet-right {
+    display: none;
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {

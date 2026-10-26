@@ -3,9 +3,10 @@
 **Which industrial thermal detections in India need attention right now — on one
 map, in plain words, and with an honest "not sure" when the evidence is thin.**
 
-Smart India Hackathon 2026 · Problem Statement 162 — classification and
-segregation of industrial thermal events from satellite thermal data, with
-GIS-based monitoring and visualisation.
+Smart India Hackathon 2026 · **Problem Statement SIH26162** — AI-Based Detection
+and Classification of Industrial Fires and Persistent Thermal Sources Using NASA
+FIRMS, OSM & Satellite Data. Organisation: National Technical Research
+Organisation (NTRO) · Theme: Disaster Management · Category: Software.
 
 ![FIRETRACE main screen](docs/screens/after/main-1366x768.png)
 
@@ -71,8 +72,8 @@ read server-side only and never reaches the browser.
 | `npm run demo` | Live when NASA is reachable, saved data when not |
 | `npm run demo:offline` | Forces the offline archive. Never touches the network |
 | `npm run prewarm` | Warms the caches before a demo and reports what it found |
-| `npm run smoke` | Full quality gate — 50 checks, starts its own servers |
-| `npm test` | 353 backend tests |
+| `npm run smoke` | Full quality gate — 80 checks, starts its own servers |
+| `npm test` | 414 backend tests |
 
 Windows users can double-click `demo.bat`, or run `.\demo.ps1 -Offline`.
 
@@ -94,14 +95,57 @@ traceable to a field the backend computed — and an explicit list of what could
 not be checked. "See evidence" opens the full picture grouped **Heat · Place ·
 History · Context**, with every number folded behind *Details for experts*.
 
-A chip in the corner always says where the data came from, and is **never**
-allowed to read "Live" unless NASA answered in that request:
+## Live and Past data
 
-- `Live · NASA FIRMS` — fetched now
-- `Live · no detections in window` — fetched now, genuinely nothing there
-- `Offline · showing saved data` — a live attempt failed; this is the last good
-  fetch, with its real age
-- `Replay · real historical data` — the committed archive
+The top-left control is one segmented **Live | Past data** and one freshness
+line. The line is computed from the newest satellite observation on screen and
+ticks every 30 seconds:
+
+- `Updated 4 min ago` — a working feed
+- `No new detections in the last 24 h` — the feed answered, there was nothing
+- `Feed delayed · last update 3 h ago` — amber dot; the real last-good data is on
+  screen with its real age, and retries continue in the background
+- `Waiting for the first update.` — a cold start with no network and nothing saved
+
+Hovering it gives the exact time in **IST and UTC**, the product, and the caveat
+that FIRMS publishes a few hours after the satellite pass. **We say
+near-real-time and show the age — we never say real-time.**
+
+**Past data** lists only periods the archive actually holds, generated from the
+data rather than hard-coded. Selecting one puts a blue rule across the top, a
+badge reading *no alerts are sent*, and a timeline you can scrub or play day by
+day. A replay can never look live, and **never sends an alert** — that is
+enforced at one point in the backend and tested directly.
+
+## Notifications
+
+Four triggers, and the three statuses that deliberately never notify. Full policy
+in [`docs/NOTIFICATION_POLICY.md`](docs/NOTIFICATION_POLICY.md).
+
+| Sends | Never sends |
+|---|---|
+| A site entering **Needs attention** | **Normal** |
+| Unusual heat at a source with an **assessed baseline** | **Watch** |
+| **New heat** at a mapped facility with no history | **Not sure** |
+| System notices (feed delayed, webhook failed) | Anything in Past data |
+
+De-duplicated per site, 6-hour cooldown, escalation overrides the cooldown,
+hysteresis so a value on a threshold cannot flap, and a quiet first run.
+Channels: in-app bell, one toast at a time, opt-in browser notifications, and an
+optional webhook (`FIRETRACE_WEBHOOK_URL`) with retry and a per-attempt audit
+row. A notification says *"New heat detected at X"*, never *"Fire confirmed"* —
+enforced by test.
+
+**No SMS or email is built in.** The webhook emits generic JSON with a Slack-,
+Teams- and Discord-compatible `text` field, which a free automation tool can
+relay to SMS or email. We do not claim to send them.
+
+## GIS export
+
+Four layers — detections, persistent sources, facilities, notifications — as
+GeoJSON per layer or one **OGC GeoPackage** in WGS 84. *Layers → Download GIS
+data*. Validated by reading the file back, not by trusting the writer. See
+[`docs/GIS.md`](docs/GIS.md).
 
 ---
 
@@ -163,6 +207,10 @@ Read this section before believing anything else in this file.
 - **Coverage is not national.** The archive holds 1,482 facilities across six
   regions (Jamnagar, Hazira, Singrauli, Korba, central Punjab, Similipal). The
   map frames the data we have rather than an India-wide box, deliberately.
+- **No per-event optical check.** There is a Map/Satellite basemap switch
+  (Esri World Imagery, attributed), but no Sentinel-2 scene lookup and no
+  band-ratio test. The evidence drawer says "Optical check: not available"
+  rather than implying one happened.
 - **Abnormality can only be assessed for 4% of sites.** A location needs at
   least two prior detection days before "unusual for this site" means anything,
   and only 16 of 390 archive sites clear that bar. The rest honestly report

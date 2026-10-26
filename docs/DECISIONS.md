@@ -130,3 +130,59 @@ Newest at the bottom.
 - **Did not retrain the model or touch the labels** · the defects were in the
   scoring and presentation layers; changing the label policy would invalidate
   the artefact and every metric with it.
+
+
+## Pass 2 - Live/Past, notifications, UI
+
+- **"Live" covers fresh, empty and delayed; the honesty moved to the age line** ·
+  three different chip words taught a reader to parse vocabulary instead of
+  reading a number, and the real risk is stale data looking fresh, not a
+  reassuring label · reverse by rendering `provenance.state` as chip text again.
+- **Internal provenance states renamed (offline -> delayed, label -> surface)** ·
+  the names now say what they are, and an explicit surface means a replay cannot
+  land under the Live segment by accident · reverse in `routes._provenance`.
+- **Past-data periods are derived from contiguous runs of >= 3 days** · shorter
+  runs are noise, and three days is the shortest span in which a persistent
+  source can show a repeat · reverse via `timeline.MIN_RUN_DAYS`.
+- **A literal `from:to` range must contain real detections or 404** · accepting
+  any well-formed span let a link render an empty week as a real period ·
+  reverse by dropping `_holds_detections`.
+- **Replay safety enforced at notification creation, not per channel** · a
+  channel added later cannot forget a check it never sees · reverse by moving
+  the `suppress` test into each channel.
+- **One notification per site per evaluation, most severe wins** · a detection on
+  a facility footprint qualifies as two reasons, and two bells for one event is
+  the fatigue the policy exists to prevent · reverse in `_reasons_for`.
+- **Browser notifications are opt-in on an explicit click** · asking on page load
+  is the fastest way to be permanently blocked · reverse in `NotificationBell`.
+- **Esri World Imagery for the satellite layer, terms flagged not verified** ·
+  PS R3 asks for imagery and Esri serves keyless and real; its terms for direct
+  third-party tile use are not unambiguous, so it is fully attributed and one
+  constant disables it · reverse by clearing `BASEMAPS.satellite.url`.
+- **Kept OpenStreetMap tiles with CSS desaturation rather than a vector style** ·
+  re-verified that CARTO still answers HTTP 200 with an "API KEY REQUIRED" PNG;
+  no keyless vector style was verified in time · reverse in `CalmMap.BASEMAPS`.
+- **The map fits India's bounds instead of a fixed zoom** · a fixed zoom 5 framed
+  half of Asia and crowded the edges with foreign-script labels · reverse by
+  restoring `center`/`zoom`.
+- **The India outline loads after first paint** · imported statically it was
+  69 KB of JSON parsed in the critical path and FCP measured 5.15 s; it is a
+  fallback, so it does not belong there · reverse to a static import.
+- **GeoPackage written with sqlite3, not GDAL** · a ~100 MB wheel chain would
+  break "runs on a laptop with no internet", and GDAL wheels on Windows are the
+  commonest install failure in Python GIS; correctness comes from reading the
+  file back · reverse by adding fiona/GDAL and rewriting `gis.write_geopackage`.
+- **The heat band draws no range where the baseline is unassessed** · an invented
+  normal range would be the most misleading pixel on the screen · reverse by
+  always drawing a band in `SiteCard.HeatBand`.
+- **Inter bundled from node_modules rather than a CDN** · a font fetched over the
+  network is missing at a venue with no Wi-Fi · reverse by using a CDN link.
+- **Dark theme built but shipped without a toggle** · it follows the system
+  setting and has had no design-QA pass, so light stays the default and the demo
+  uses light · reverse by adding a toggle after a QA round.
+- **Deleted the dead `frontend/src/map.css`** · Pass 1's stylesheet was orphaned
+  when every class moved from `m-*` to `fc-*` · reverse with `git show`.
+- **Did not build backfill_history, WorldCover or Sentinel-2** · all three are
+  data-acquisition work with external dependencies, and the priority order put
+  UI, notifications and the gate first; each is recorded honestly in
+  `docs/PS_COMPLIANCE.md` rather than quietly skipped.

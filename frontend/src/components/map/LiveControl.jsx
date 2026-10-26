@@ -116,7 +116,9 @@ export default function LiveControl({
   if (loading && !provenance) {
     line = null
   } else if (isPast) {
-    line = `Showing ${provenance.range?.label ?? activeRange?.label ?? 'a saved period'}`
+    // The floating replay badge is hidden on narrow screens, so the card itself
+    // has to carry the statement. Said here rather than only in the badge.
+    line = `Showing ${provenance.range?.label ?? activeRange?.label ?? 'a saved period'} — no alerts are sent`
   } else if (state === 'empty') {
     line = 'No new detections in the last 24 h'
   } else if (state === 'unavailable') {

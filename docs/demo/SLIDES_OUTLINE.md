@@ -30,16 +30,16 @@ why.
 
 **Visual:** `docs/screens/after/main-1366x768.png`, full bleed.
 
-**Say:** Eight need attention, seventeen to watch, two hundred and fifty-four
-normal. Plain words, not a dashboard.
+**Say:** Seven need attention, eight to watch, eighteen normal, ten not sure —
+from forty-three sites. Plain words, not a dashboard.
 
-**Numbers:** 8 / 17 / 254 (claim C1).
+**Numbers:** 7 / 8 / 18 / 10 (claim C1).
 
 ---
 
 ## 3 — The idea, in one comparison
 
-**Headline:** Same plant. Opposite answers. The one we ignore is 8.7× hotter.
+**Headline:** Same plant. Opposite answers. The one we ignore is 8.7x hotter.
 
 **Visual:** Two cards side by side — the red ArcelorMittal card and the green
 one. Screenshots, not a diagram.
@@ -83,8 +83,8 @@ cropped from real screenshots.
 when we cannot. A replay is never allowed to look like live data. Verified with
 a deliberately wrong API key and with no network at all.
 
-**Numbers:** interactive 1.5-3.2 s, FCP under 1.7 s, 353 tests, smoke 50/50
-(claims E1, E2, F1, F2).
+**Numbers:** FCP 1.2 s, 414 tests, smoke 80/80, axe 0 violations
+(claims F1, F7, G1, G2).
 
 ---
 
