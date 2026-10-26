@@ -15,7 +15,7 @@ Rules for this table: **no row says Done without a passing test or a recorded
 reproducible check.** Where something is partial, the limitation is stated rather
 than rounded up.
 
-Last verified 2026-10-26 on branch `sih-pass2`, `npm run smoke` → 80/80.
+Last verified 2026-10-26 on branch `sih-pass2`, `npm run smoke` → 81/81.
 
 ---
 
@@ -49,14 +49,29 @@ has never been validated against a verified fire.
 
 ### R1 addendum — honest validation surfaces
 
-Because the headline metric is meaningless as a capability claim, two things
+Because the headline metric is meaningless as a capability claim, three things
 exist so the project does not lead with it:
 
 - **No screen, slide or doc leads with 1.0.** `docs/MODEL_AUDIT.md` opens by
   saying the metric is circular; `JUDGE_QA.md` Q3 answers it directly; the
   claims register marks "validated real-world accuracy" as **never claim this**.
 - **"About this data"** (the ⓘ button, top right) states the sources, the
-  near-real-time caveat and the coverage limit in plain words.
+  near-real-time caveat and the coverage limit in plain words — and now carries
+  the consistency checks below, under their own caveat.
+- **Consistency checks on real detections** (`MODEL_AUDIT.md` §6), measured by
+  `python -m ml.proxy_checks` and titled *consistency checks, not ground truth*:
+
+  | Check | Result |
+  |---|---|
+  | Recurring heat inside mapped industrial sites reads industrial | 92/98 (93.9%), 0 disagreements |
+  | Single-day heat over vegetation far from industry reads agricultural or natural | 100/100 |
+  | Agreement with the FIRMS static-source flag | **unavailable** — the `type` field is not retained |
+  | Ablation without map context | abstention 8.3% → **74.6%**, median score 0.79 → 0.48 |
+
+  The ablation is the useful one: stripped of facility and land-cover context the
+  model abstains nine times more often rather than inventing confidence. **None
+  of these is accuracy** — they compare the classifier against map context, not
+  against verified incidents.
 
 ---
 
@@ -131,6 +146,8 @@ Stated here rather than left for a judge to discover.
 | **ESA WorldCover land-cover lookup** | Not integrated. Land cover stays OSM-derived and reports "not mapped" where absent. |
 | **Sentinel-2 per-event optical check** | Not integrated. The satellite basemap switch ships instead, and the drawer says "Optical check: not available". |
 | **Analyst labelling control** | The *schema* separates predicted class from any human label, but the popover and CSV export are not built. Mark reviewed records review, not a label. |
+| **Dense history backfill** | Still not written. Unchanged from Pass 2 and still the highest-value next action. |
+| **ESA WorldCover land cover** | Still not integrated. Land cover stays OSM-derived at ~53% coverage and reports "unavailable" where absent. |
 | **Dark theme** | Built as a complete token set in `tokens.css` and it follows the system setting, but there is no manual toggle and it has had no design-QA pass. Light is the default and is what the demo should use. |
 
 ---
@@ -139,7 +156,7 @@ Stated here rather than left for a judge to discover.
 
 ```bash
 npm run smoke                 # 80 checks across all ten groups
-cd backend && .venv/Scripts/python.exe -m pytest -q     # 414 tests
+cd backend && .venv/Scripts/python.exe -m pytest -q     # 428 tests
 ```
 
 Per requirement:
@@ -150,6 +167,9 @@ cd backend && .venv/Scripts/python.exe -m pytest tests/test_map_verdict.py tests
 
 # R4 — GIS export, including reading the GeoPackage back
 cd backend && .venv/Scripts/python.exe -m pytest tests/test_gis_export.py -q
+
+# R1 — the consistency checks
+cd backend && .venv/Scripts/python.exe -m ml.proxy_checks
 
 # R5 — notifications, including replay safety
 cd backend && .venv/Scripts/python.exe -m pytest tests/test_notifications.py -q

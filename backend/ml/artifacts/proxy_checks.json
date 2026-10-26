@@ -1,0 +1,54 @@
+{
+  "title": "Consistency checks, not ground truth",
+  "disclaimer": "These compare the classifier against independent map context, not against verified incident reports. Agreement indicates internal consistency. It is NOT accuracy: no detection in this project has a verified cause, so an agreement figure here must never be quoted as a correctness rate.",
+  "detections_analysed": 716,
+  "archive_date_range": {
+    "from": "2025-11-11",
+    "to": "2026-09-10"
+  },
+  "checks": [
+    {
+      "name": "Recurring heat inside mapped industrial sites reads industrial",
+      "considered": 98,
+      "agreed": 92,
+      "abstained": 6,
+      "agreement": 0.9388,
+      "disagreements": {},
+      "rule": "Detections with >=2 distinct prior days AND either on a facility footprint (<=0.75 km) or on industrial land cover."
+    },
+    {
+      "name": "Single-day heat over vegetation far from industry reads agricultural or natural",
+      "considered": 100,
+      "agreed": 100,
+      "abstained": 0,
+      "agreement": 1.0,
+      "disagreements": {},
+      "rule": "Detections with no prior day at the location, >= 8.0 km from any mapped facility, over cropland, forest or grassland."
+    },
+    {
+      "name": "Agreement with the FIRMS static-source flag",
+      "considered": 0,
+      "agreed": 0,
+      "agreement": null,
+      "status": "unavailable",
+      "why": "The FIRMS `type` field (0 vegetation, 1 active volcano, 2 other static land source, 3 offshore) is not retained by this project's normalisation, so there is nothing to compare against. Capturing it would make this the most useful check here, because it is the only persistence opinion that does not come from our own rules.",
+      "records_with_any_confidence_field": 716
+    },
+    {
+      "name": "Ablation: classifier behaviour with and without map context",
+      "with_map_context": {
+        "detections": 180,
+        "abstained": 15,
+        "abstention_rate": 0.0833,
+        "median_score": 0.7915
+      },
+      "without_map_context": {
+        "detections": 169,
+        "abstained": 126,
+        "abstention_rate": 0.7456,
+        "median_score": 0.4833
+      },
+      "rule": "Compares detections that have BOTH a facility within the search radius and a land-cover polygon against those that have NEITHER. Not a retrain; it measures how the shipped model behaves when its two strongest context features are absent."
+    }
+  ]
+}

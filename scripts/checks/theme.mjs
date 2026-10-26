@@ -52,15 +52,36 @@ async function capture(screen, colorScheme) {
    *   - map tiles, which arrive in a different order every time and are a
    *     third party's bytes rather than our styling. */
   await page.evaluate(async () => {
-    document.querySelectorAll('.fc-fresh, .fc-tl-day, .fc-tl-of, .fc-notif-age').forEach((el) => {
+    /* Everything whose content comes from the feed rather than from styling.
+     * The Live surface especially: two loads seconds apart can legitimately see
+     * a different number of detections, or flip between "fresh" and "empty", so
+     * comparing those pixels would be comparing NASA's day, not our theme. */
+    const volatile = [
+      '.fc-fresh',
+      '.fc-summary',
+      '.fc-tl-day',
+      '.fc-tl-of',
+      '.fc-notif-age',
+      '.fc-chip',
+      '.fc-queue-name',
+      '.fc-queue-count',
+      '.fc-cluster',
+    ]
+    document.querySelectorAll(volatile.join(', ')).forEach((el) => {
       el.textContent = 'x'
     })
-    document.querySelectorAll('.leaflet-tile-pane').forEach((el) => {
+    /* Hide the map canvas entirely.
+     *
+     * The regression this check exists for was in the chrome — panels, text,
+     * clusters, controls. The map underneath is third-party tiles at a position
+     * that depends on when a fly-to animation finished, so including it made the
+     * comparison flaky in a way that had nothing to do with theme: a different
+     * screen failed on each run while every computed-style assertion passed.
+     *
+     * Marker and cluster colours are still covered: by the computed-style
+     * assertions below, and by the colour tokens being the only source of them. */
+    document.querySelectorAll('.fc-canvas').forEach((el) => {
       el.style.visibility = 'hidden'
-    })
-    // The cluster bubbles carry counts that shift with the replay position.
-    document.querySelectorAll('.fc-cluster').forEach((el) => {
-      el.textContent = '0'
     })
   })
   await page.waitForTimeout(300)
@@ -75,8 +96,24 @@ async function capture(screen, colorScheme) {
     const el = document.querySelector('.fc-wordmark')
     return el ? getComputedStyle(el).color : null
   })
+  // Clusters were near-black under the old dark theme, which buried the one
+  // thing the map exists to surface. Checked by computed style, because the
+  // canvas is hidden for the pixel comparison above.
+  const cluster = await page.evaluate(() => {
+    const el = document.querySelector('.fc-cluster')
+    if (!el) return null
+    const cs = getComputedStyle(el)
+    // Luminance of the bubble's fill. The old dark theme made this near-black,
+    // which buried the one thing the map exists to surface.
+    const [r, g, b] = (cs.backgroundColor.match(/\d+/g) ?? [0, 0, 0]).map(Number)
+    return {
+      background: cs.backgroundColor,
+      color: cs.color,
+      luminance: Math.round((0.2126 * r + 0.7152 * g + 0.0722 * b) / 2.55) / 100,
+    }
+  })
   await ctx.close()
-  return { buffer, scheme, bodyBg, ink }
+  return { buffer, scheme, bodyBg, ink, cluster }
 }
 
 for (const screen of SCREENS) {
@@ -112,6 +149,16 @@ for (const screen of SCREENS) {
     light.ink === dark.ink,
     String(dark.ink),
   )
+  if (light.cluster || dark.cluster) {
+    const same =
+      light.cluster?.background === dark.cluster?.background &&
+      light.cluster?.color === dark.cluster?.color
+    record(
+      `${screen.name}: clusters stay light`,
+      same && (dark.cluster?.luminance ?? 0) > 0.8,
+      `fill ${dark.cluster?.background} (luminance ${dark.cluster?.luminance})`,
+    )
+  }
 }
 
 await browser.close()

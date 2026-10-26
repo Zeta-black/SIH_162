@@ -67,6 +67,7 @@ async function measure(label, drive, ms = 3000) {
 }
 
 // --------------------------------------------------------------- load
+const navStart = Date.now()
 await page.goto(`${WEB}/?demo=1`, { waitUntil: 'domcontentloaded' })
 await page.waitForSelector('.fc-live', { timeout: 60000 })
 await page.waitForSelector('.fc-timeline', { timeout: 60000 }).catch(() => {})
@@ -75,6 +76,22 @@ await page.waitForTimeout(5000)
 const markers = await page.evaluate(
   () => document.querySelectorAll('.fc-marker, .fc-cluster').length,
 )
+
+/* Paint timings on the production build.
+ *
+ * The smoke gate measures these on the dev server, where they are a statement
+ * about Vite's on-demand transforms rather than about the product. These are
+ * the numbers that describe what a user would actually get. */
+const paint = await page.evaluate(() => {
+  const fcp = performance.getEntriesByName('first-contentful-paint')[0]
+  const nav = performance.getEntriesByType('navigation')[0]
+  return {
+    fcpMs: fcp ? Math.round(fcp.startTime) : null,
+    domContentLoadedMs: nav ? Math.round(nav.domContentLoadedEventEnd) : null,
+    loadMs: nav ? Math.round(nav.loadEventEnd) : null,
+  }
+})
+const interactiveMs = Date.now() - navStart
 
 /* Driving happens INSIDE the page, not over CDP.
  *
@@ -159,6 +176,15 @@ if (hasTimeline) {
 await browser.close()
 
 // ------------------------------------------------------------- report
+console.log(`\n  Production build — paint`)
+console.log(`  ${'-'.repeat(58)}`)
+console.log(
+  `  first contentful paint   ${paint.fcpMs ?? '?'} ms\n` +
+    `  DOMContentLoaded         ${paint.domContentLoadedMs ?? '?'} ms\n` +
+    `  load                     ${paint.loadMs ?? '?'} ms\n` +
+    `  map ready (wall clock)   ${interactiveMs} ms`,
+)
+
 console.log(`\n  Frame rate — production build, ${markers} markers on screen`)
 console.log(`  ${'-'.repeat(58)}`)
 let worstMean = Infinity

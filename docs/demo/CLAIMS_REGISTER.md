@@ -12,7 +12,7 @@ evidence behind it and an honest status.
 - **Not verified** — we believe it but have not established it. Do not assert.
 
 All measurements taken 2026-10-26 on Windows 11 Pro 26100, Node v24.18.0,
-Python 3.11.9, branch `sih-pass2`, `npm run smoke` → **80/80**.
+Python 3.11.9, branch `sih-pass2`, `npm run smoke` → **81/81**.
 
 ---
 
@@ -107,15 +107,34 @@ Python 3.11.9, branch `sih-pass2`, `npm run smoke` → **80/80**.
 
 | # | Claim | Evidence | Status |
 |---|---|---|---|
-| F1 | First contentful paint ~1.2 s | Browser checks: 1,164 ms (was 5,152 ms before the India outline was made lazy) | **Verified** |
-| F2 | App interactive in 1.5-6.7 s | Observed 1,510 / 2,030 / 3,155 / 6,694 ms across runs. **Quote the range.** The high end is a cold Vite dev server with a live fetch in flight; this is measured on the dev server, not the production build | **Verified (as a range)** |
+| F1 | First contentful paint **408 ms on the production build** | `npm run perf` — production build served by `vite preview`. On the Vite dev server the same measurement ranges 980-2,044 ms, which is a statement about on-demand transforms rather than about the product | **Verified** |
+| F2 | App interactive in 2.0-6.7 s | Observed 1,510 / 1,980 / 2,005 / 2,280 / 2,862 / 6,694 ms across runs on the dev server. **Quote the range.** On the production build, map-ready wall clock (including the archive fetch) measured 5,949 ms | **Verified (as a range)** |
 | F3 | `/api/map` responds in 210-425 ms warm | Smoke group 4 across runs | **Verified** |
 | F4 | Cold archive analysis ~3 s, warm ~0.1 s | Measured 2.9 s / 0.105 s | **Verified** |
 | F5 | Clustering 716 detections takes ~100 ms | `GET /api/events` → `timing_ms.clustering: 103.8` | **Verified** |
 | F6 | Zero console errors | Browser checks at 1366×768, 1920×1080, 390×844; 12 design-QA screens | **Verified** |
 | F7 | No critical or serious WCAG 2 A/AA violations | axe-core: 20 rules passed, 0 violations (1 serious found and fixed this pass — `aria-expanded` on a bare search input) | **Verified** |
 | F8 | "Lighthouse score of N" | — Lighthouse was not run | **NOT VERIFIED — never quote a Lighthouse score** |
-| F9 | Map sustains ≥50 fps during pan/zoom and replay | — frame rate was not instrumented. Marker draw cost is reported by the map component but no fps figure was captured | **NOT VERIFIED — do not quote an fps number** |
+| F9 | Map sustains ≥50 fps during pan/zoom and replay | **Measured, and pan does not.** `npm run perf`, production build, two runs: pan 18-32 fps mean (p95 12-20), zoom 46-58 (p95 30-60), replay 4x 51-60 (p95 20-60). Zoom and replay reach ~50; **pan does not** | **Verified — and the ≥50 claim is false for panning. Do not make it** |
+| F10 | Panning is slow because of marker count | — the same figure appears with four markers on screen, so the cost is Leaflet's tile repositioning, not our rendering | **Verified (as a diagnosis, not a fix)** |
+
+---
+
+## F2. Consistency checks (proxy, not ground truth)
+
+Run with `cd backend && .venv/Scripts/python.exe -m ml.proxy_checks`, written to
+`backend/ml/artifacts/proxy_checks.json`, documented in `docs/MODEL_AUDIT.md` §6.
+
+**Say "consistency checks, not accuracy" every single time one of these is
+quoted.** Agreement with map context is not correctness.
+
+| # | Claim | Evidence | Status |
+|---|---|---|---|
+| P1 | Recurring heat inside mapped industrial sites reads industrial in 92 of 98 cases (93.9%) | `proxy_checks.json`; 6 abstained, 0 disagreed | **Verified (as consistency, not accuracy)** |
+| P2 | Single-day heat over vegetation far from industry reads agricultural or natural in 100 of 100 cases | `proxy_checks.json` | **Verified (as consistency, not accuracy)** |
+| P3 | Without map context the model abstains 9× more often — 74.6% vs 8.3% — and its median score falls from 0.79 to 0.48 | `proxy_checks.json` ablation, 180 vs 169 detections | **Verified** |
+| P4 | Agreement with the FIRMS static-source flag | — the `type` field is not retained by our normalisation, so there is nothing to compare against | **NOT VERIFIED — unavailable, and the most valuable of these to add** |
+| P5 | "Our classifier is 94% accurate" | — **this is the misreading P1 invites and it is false.** Agreement with map context where the map has an opinion | **NEVER SAY THIS** |
 
 ---
 
@@ -124,7 +143,9 @@ Python 3.11.9, branch `sih-pass2`, `npm run smoke` → **80/80**.
 | # | Claim | Evidence | Status |
 |---|---|---|---|
 | G1 | 414 automated tests pass | `cd backend && .venv/Scripts/python.exe -m pytest -q` → `414 passed` | **Verified** |
-| G2 | `npm run smoke` is green | 80/80 across ten groups | **Verified** |
+| G2 | `npm run smoke` is green | 81/81 across ten groups | **Verified** |
+| G7 | The app renders identically regardless of the OS colour preference | `scripts/checks/theme.mjs` — Live, Past and the card captured under both a light and a dark preference, pixel-identical, with `color-scheme: light`, white panels, dark ink and light clusters asserted by computed style | **Verified** |
+| G8 | The boundary outline appears only when tiles fail | Browser checks block both tile hosts and assert the note, 1 country path, 36 states, `fill: none` and that markers still render; the converse is asserted with tiles working | **Verified** |
 | G3 | No secret is tracked, and none remains in history | Smoke group 1 (6 checks) scans tracked files **and** git history. The one historical leak was scrubbed with `git filter-repo`; only `backup-before-scrub` retains it, and the gate reports that explicitly | **Verified** |
 | G4 | The GeoPackage is a valid OGC GeoPackage | `test_gis_export.py` (20) and smoke group 10 download it, write it to disk and parse it back: application id, 4 layers, SRS 4326, valid geometry headers | **Verified** |
 | G5 | The GeoPackage opens in QGIS or ArcGIS | — not opened in either on this machine; `ogrinfo` is not installed | **NOT VERIFIED — say "valid by format checks and read-back"** |
@@ -146,3 +167,7 @@ Say these before a judge has to ask. They land as rigour, not as weakness.
 6. **No SMS or email.** A webhook that can be relayed is not an SMS gateway.
 7. **The official PS text is not in the repo.** Our requirement table is a
    reconstruction and is marked unverified.
+8. **Panning runs at 18-32 fps**, below a 50 fps target. Zoom and replay reach
+   it. The cost is Leaflet's tile repositioning rather than our markers.
+9. **The proxy checks are consistency, not accuracy.** Never quote 93.9% as a
+   correctness rate.

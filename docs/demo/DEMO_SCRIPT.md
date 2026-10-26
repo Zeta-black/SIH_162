@@ -152,6 +152,17 @@ Say the two numbers and move on.
 > of inventing a number. That was the worst bug in our last build and we fixed it
 > by making the answer smaller and true."
 
+**If a judge pushes on validation,** open the ⓘ button (top right):
+
+> "We also run consistency checks on the real archive — and we title them
+> *consistency checks, not ground truth*, because that is what they are. The one
+> worth your attention: strip the map context away and the model abstains
+> seventy-five percent of the time instead of eight. It stops guessing rather
+> than inventing confidence. That is measured, not asserted."
+
+Do **not** say "ninety-four percent accurate". The number is agreement with map
+context, not correctness. `JUDGE_QA.md` Q4b.
+
 This is the trust moment. Do not rush it.
 
 ---
@@ -220,6 +231,10 @@ Point at the footer:
 - Do **not** claim we confirm fires. We classify thermal detections.
 - Do **not** claim a per-event optical/Sentinel-2 check. We have a satellite
   basemap; the drawer says "Optical check: not available".
+- Do **not** quote the consistency checks as accuracy. 93.9% is *agreement with
+  map context*, not a correctness rate.
+- Do **not** claim 50 fps. Measured: zoom and replay reach it, **panning does
+  not** (18-32 fps).
 - Do **not** mention other teams.
 
 ---

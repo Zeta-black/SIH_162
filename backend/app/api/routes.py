@@ -8,8 +8,10 @@ from __future__ import annotations
 
 import csv
 import io
+import json
 import logging
 from datetime import date, datetime, timedelta, timezone
+from pathlib import Path
 
 from fastapi import APIRouter, HTTPException, Query, Response
 from pydantic import BaseModel, Field
@@ -639,6 +641,66 @@ def _site(e) -> dict:
     }
 
 
+# The proxy-check report is written by `python -m ml.proxy_checks` and read
+# here. Absent, the About panel simply omits the section rather than inventing
+# figures.
+_PROXY_REPORT = Path(__file__).resolve().parents[2] / "ml" / "artifacts" / "proxy_checks.json"
+
+
+def _about_block(result) -> dict:
+    """What "About this data" shows. Every figure is read, never asserted."""
+    snap = snapshot_service.load_snapshot()
+    meta = snap.meta if snap else {}
+    date_range = meta.get("date_range") or {}
+    regions = meta.get("regions") or []
+
+    proxy: list[dict] = []
+    try:
+        report = json.loads(_PROXY_REPORT.read_text(encoding="utf-8"))
+        for check in report.get("checks", []):
+            if check.get("status") == "unavailable":
+                proxy.append({"name": check["name"], "result": "not available"})
+            elif "with_map_context" in check:
+                with_ctx = check["with_map_context"]
+                without = check["without_map_context"]
+                proxy.append({
+                    "name": "Abstains more when map context is missing",
+                    "result": (
+                        f"{round((without['abstention_rate'] or 0) * 100)}% vs "
+                        f"{round((with_ctx['abstention_rate'] or 0) * 100)}%"
+                    ),
+                })
+            elif check.get("agreement") is not None:
+                proxy.append({
+                    "name": check["name"],
+                    "result": f"{check['agreed']}/{check['considered']} agree",
+                })
+    except (OSError, ValueError, KeyError):
+        # No report, or an unreadable one. Say nothing rather than guess.
+        proxy = []
+
+    model = get_classifier().info()
+    return {
+        "facilities": len(result.facilities),
+        "detections": len(result.events),
+        "date_range": (
+            f"{date_range.get('from')} to {date_range.get('to')}"
+            if date_range.get("from")
+            else None
+        ),
+        "regions": f"{len(regions)} industrial and vegetation areas" if regions else None,
+        "region_names": regions,
+        "model_version": model.model_version,
+        "n_features": model.n_features,
+        "proxy_checks": proxy,
+        "proxy_caveat": (
+            "Consistency checks, not ground truth. These compare the classifier "
+            "against independent map context, not against verified incident "
+            "reports. Agreement is not accuracy."
+        ),
+    }
+
+
 @router.get("/api/timeline", tags=["map"])
 def timeline() -> dict:
     """Date ranges FIRETRACE actually holds, newest first.
@@ -748,6 +810,7 @@ def map_view(
             ),
         },
         "disclaimer": DISCLAIMER,
+        "about": _about_block(result),
         "sites": sites[:limit],
         "truncated": max(0, len(sites) - limit),
     }

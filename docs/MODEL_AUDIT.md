@@ -229,3 +229,82 @@ cd backend
 Model metrics come from the committed artefact; retraining is
 `.venv/Scripts/python.exe -m ml.train` and needs the dataset in
 `backend/ml/data/`.
+
+
+---
+
+## 6. Consistency checks on real detections
+
+**These are not ground truth and not accuracy.**
+
+The headline 1.0 metric is circular (section 3). These checks are a different,
+weaker thing: each asks whether the classifier agrees with independent map
+context. Agreement indicates internal consistency. It does **not** indicate
+correctness, because no detection in this project has a verified cause.
+
+Said plainly, because it is the obvious misreading: **a 94% agreement figure
+below does not mean 94% of classifications are right.** It means the classifier
+and the map agree 94% of the time about cases where the map has an opinion.
+
+Run them yourself:
+
+```bash
+cd backend && .venv/Scripts/python.exe -m ml.proxy_checks
+```
+
+Measured on the committed archive, 716 detections
+(2025-11-11 to 2026-09-10):
+
+| Check | Result |
+|---|---|
+| Recurring heat inside mapped industrial sites reads industrial | **92/98 agree (93.9%)**, 6 abstained, 0 disagree |
+| Single-day heat over vegetation far from industry reads agricultural or natural | **100/100 agree (100.0%)**, 0 abstained |
+| Agreement with the FIRMS static-source flag | **not available** — see below |
+| Ablation without map features | see below |
+
+### What each one does
+
+**Recurring heat on industrial ground.** Detections with at least two distinct
+prior days at the location, sitting either on a mapped facility footprint
+(≤ 0.75 km) or on industrial land cover. A thermal source that repeats inside an
+industrial site is a furnace, flare or kiln far more often than a crop fire, so
+a classifier that disagreed here would be suspect. 92 of
+98 read industrial, 6 abstained, and
+0 actively disagreed.
+
+**Vegetation away from industry.** Detections with no prior day at the location,
+at least 8 km from any mapped facility, over cropland, forest or grassland. All
+100 read agricultural or natural.
+
+**The FIRMS static-source flag — unavailable, and worth fixing.** FIRMS products
+carry a `type` field (0 vegetation, 1 active volcano, 2 other static land
+source, 3 offshore). Type 2 is NASA's own opinion that a detection is a
+persistent non-vegetation heat source, which would be the only persistence
+judgement here not derived from our own rules — and therefore the most valuable
+check on this page. **This project's normalisation does not retain that field**,
+so there is nothing to compare against. Capturing it is a small change to
+`services/firms.py` and a rebuild of the archive.
+
+### Ablation: the evidence gate, measured
+
+Not a retrain. This compares what the shipped model does for detections that
+have **both** a facility within the search radius and a land-cover polygon,
+against detections that have **neither**.
+
+| | Detections | Abstained | Median model score |
+|---|---:|---:|---:|
+| With map context | 180 | **8.3%** | 0.7915 |
+| Without map context | 169 | **74.6%** | 0.4833 |
+
+Stripped of its two strongest context features, the model abstains
+**9× more often** and its median
+score falls from 0.7915 to 0.4833.
+
+That is the behaviour we want and it is worth being precise about why: a Random
+Forest with no facility and no land cover is voting on position and radiative
+power alone, and *will* still return a confident-looking number. The evidence
+gate is what turns that into an abstention. This measurement is the evidence
+that it works on real data rather than only in principle.
+
+It is also the honest limit of the claim: the gate stops the model asserting
+things it cannot support. It does not make the things it *does* assert correct.

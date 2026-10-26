@@ -286,8 +286,8 @@ export function AboutSheet({ open, onClose, about }) {
                 ))}
               </dl>
               <p className="fc-sheet-note">
-                These compare the classifier against map context, not against
-                verified incident reports. They indicate consistency, not accuracy.
+                {about.proxy_caveat ??
+                  'These compare the classifier against map context, not against verified incident reports. They indicate consistency, not accuracy.'}
               </p>
             </>
           )}

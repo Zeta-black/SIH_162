@@ -94,6 +94,37 @@ labels exist in this project.
 
 ---
 
+### Q4b. Have you checked the classifier against anything independent?
+
+Yes, and we are careful about what it shows. `MODEL_AUDIT.md` §6 has four
+**consistency checks on real detections** — run them with
+`python -m ml.proxy_checks`:
+
+- Recurring heat inside a mapped industrial site reads industrial in **92 of 98
+  cases**, with six abstentions and **zero disagreements**.
+- Single-day heat over vegetation far from industry reads agricultural or
+  natural in **100 of 100**.
+- Stripped of facility and land-cover context, the model **abstains 74.6% of the
+  time instead of 8.3%**, and its median score falls from 0.79 to 0.48.
+
+That third one is the one we would point at. A Random Forest with no facility
+and no land cover is voting on position and radiative power alone and will still
+return a confident-looking number; the evidence gate turns that into an
+abstention, and this is the measurement showing it works on real data.
+
+**What these are not:** accuracy. They compare the classifier against map
+context, not against verified incidents. A 93.9% agreement figure means the
+classifier and the map agree 93.9% of the time where the map has an opinion — it
+does **not** mean 93.9% of classifications are right. We will not quote it that
+way and you should not let anyone else.
+
+One check is honestly unavailable: FIRMS carries a `type` field flagging known
+static heat sources, which would be the only persistence judgement here not
+derived from our own rules. **Our normalisation does not retain it.** It is the
+most valuable thing on that page that we have not done.
+
+---
+
 ### Q5. How do notifications work, and how do you avoid alert fatigue?
 
 The policy is a document before it is code: `docs/NOTIFICATION_POLICY.md`,
@@ -292,7 +323,7 @@ Yes, please. Three things to try:
 3. **Ask for a date range we do not hold.** `?range=1999-01-01:1999-01-05`
    returns 404 rather than rendering an empty week as though it were real.
 
-And if you want the whole gate: `npm run smoke` — 80 checks across secrets, lint,
-build, 414 unit tests, every API route, the degradation matrix, UI copy, the
+And if you want the whole gate: `npm run smoke` — 81 checks across secrets, lint,
+build, 428 unit tests, every API route, the degradation matrix, UI copy, the
 Live/Past surfaces, GIS export, and a real browser pass with axe accessibility.
 It prints PASS/FAIL per group with real numbers.
